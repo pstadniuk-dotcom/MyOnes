@@ -18,6 +18,7 @@ import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/fo
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
+import { detectRejectedIngredients, detectFormulationModeChange } from '../../modules/chat/preference-detector';
 import { normalizeImageForVision } from '../../utils/fileAnalysis';
 import posthog from '../../infra/posthog';
 import { syncUserProperties } from '../../infra/posthog';
@@ -28,6 +29,59 @@ import { logAiUsage, estimateTokenCount } from '../../modules/ai-usage/ai-usage.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface ImageAttachment { base64: string; mimeType: string; fileName: string; }
+
+
+/**
+ * Detect provider rate-limit errors (HTTP 429) from OpenAI / Anthropic
+ * SDK exceptions and emit a friendly SSE event so the client can show
+ * a helpful message + auto-retry with backoff.
+ *
+ * Returns true if the error WAS a rate-limit (and was handled), false
+ * otherwise (caller should rethrow).
+ */
+function handleProviderRateLimit(
+    err: unknown,
+    sendSSE: (data: any) => void,
+    provider: 'openai' | 'anthropic',
+    userId: string
+): boolean {
+    const e = err as any;
+    const status = e?.status ?? e?.statusCode ?? e?.response?.status;
+    const code = e?.code ?? e?.error?.code;
+    const message = String(e?.message ?? e?.error?.message ?? '').toLowerCase();
+
+    const isRateLimit =
+        status === 429 ||
+        code === 'rate_limit_exceeded' ||
+        code === 'insufficient_quota' ||
+        message.includes('rate limit') ||
+        message.includes('429');
+
+    if (!isRateLimit) return false;
+
+    // Pull retry-after from headers if available, else fall back to a sane default
+    const retryAfterHeader = e?.headers?.['retry-after']
+        ?? e?.response?.headers?.get?.('retry-after')
+        ?? e?.response?.headers?.['retry-after'];
+    const retryAfterSec = Number(retryAfterHeader) || 15;
+
+    logger.warn('AI provider rate limit hit', {
+        provider,
+        userId,
+        status,
+        code,
+        retryAfterSec,
+    });
+
+    sendSSE({
+        type: 'rate_limit',
+        provider,
+        retryAfterMs: retryAfterSec * 1000,
+        message: `Our AI is briefly overloaded. Retrying in ${retryAfterSec}s — your message is safe.`,
+    });
+
+    return true;
+}
 
 
 export class ChatController {
@@ -344,6 +398,53 @@ export class ChatController {
 
             const previousMessages = await chatRepository.listMessagesBySession(chatSession.id);
 
+            // ── Per-session preference detection ────────────────────────────
+            // Detect "remove X" / "drop X" / "no Y" phrases in this user turn
+            // and persist the union of all rejected ingredients on the session
+            // so the AI doesn't reintroduce them on future regenerations.
+            // Also detect "make it simpler / focused / like AG1" → focused mode.
+            const newlyRejected = detectRejectedIngredients(message);
+            const modeChange = detectFormulationModeChange(message);
+
+            const existingRejected: string[] = Array.isArray((chatSession as any).rejectedIngredients)
+                ? (chatSession as any).rejectedIngredients
+                : [];
+            const mergedRejected = Array.from(new Set([...existingRejected, ...newlyRejected]));
+
+            const prefsToPersist: { rejectedIngredients?: string[]; formulationMode?: string } = {};
+            if (newlyRejected.length > 0 && mergedRejected.length !== existingRejected.length) {
+                prefsToPersist.rejectedIngredients = mergedRejected;
+            }
+            if (modeChange && modeChange !== ((chatSession as any).formulationMode || 'comprehensive')) {
+                prefsToPersist.formulationMode = modeChange;
+            }
+            if (Object.keys(prefsToPersist).length > 0) {
+                try {
+                    await chatRepository.updateSessionPreferences(chatSession.id, prefsToPersist);
+                    if (prefsToPersist.rejectedIngredients) {
+                        logger.info('Session rejected-ingredients updated', {
+                            userId,
+                            sessionId: chatSession.id,
+                            newlyRejected,
+                            totalRejected: mergedRejected,
+                        });
+                    }
+                    if (prefsToPersist.formulationMode) {
+                        logger.info('Session formulation mode changed', {
+                            userId,
+                            sessionId: chatSession.id,
+                            mode: prefsToPersist.formulationMode,
+                        });
+                    }
+                } catch (prefErr) {
+                    logger.warn('Failed to persist session preferences', { userId, error: prefErr });
+                }
+            }
+
+            const effectiveFormulationMode: 'comprehensive' | 'focused' =
+                (prefsToPersist.formulationMode as 'comprehensive' | 'focused' | undefined)
+                ?? ((chatSession as any).formulationMode === 'focused' ? 'focused' : 'comprehensive');
+
             // Fetch discontinued ingredients from manufacturer catalog so AI avoids them
             const { ingredientCatalogRepository } = await import('../../modules/formulas/ingredient-catalog.repository');
             const allManufacturerIngredients = await ingredientCatalogRepository.getAll();
@@ -362,6 +463,8 @@ export class ChatController {
                 isActiveMember,
                 hasOrderedFormula,
                 discontinuedIngredientNames: discontinuedIngredientNames.length > 0 ? discontinuedIngredientNames : undefined,
+                rejectedIngredientNames: mergedRejected.length > 0 ? mergedRejected : undefined,
+                formulationMode: effectiveFormulationMode,
             };
 
             const fullSystemPrompt = buildO1MiniPrompt(promptContext);
@@ -441,38 +544,54 @@ export class ChatController {
             if (aiProvider === 'anthropic') {
                 const systemPrompt = fullSystemPrompt;
                 const msgs = conversationHistory.slice(1);
-                for await (const chunk of chatService.streamAnthropic(systemPrompt, msgs, model, 0.7, 4096)) {
-                    if (chunk.type === 'text') {
-                        fullResponse += chunk.content;
-                        chunkCount++;
-                        sendSSE({ type: 'chunk', content: chunk.content, sessionId: chatSession.id, chunkIndex: chunkCount });
-                    } else if (chunk.type === 'usage') {
-                        promptTokensActual = (chunk as any).inputTokens || 0;
-                        completionTokensActual = (chunk as any).outputTokens || 0;
+                try {
+                    for await (const chunk of chatService.streamAnthropic(systemPrompt, msgs, model, 0.7, 4096)) {
+                        if (chunk.type === 'text') {
+                            fullResponse += chunk.content;
+                            chunkCount++;
+                            sendSSE({ type: 'chunk', content: chunk.content, sessionId: chatSession.id, chunkIndex: chunkCount });
+                        } else if (chunk.type === 'usage') {
+                            promptTokensActual = (chunk as any).inputTokens || 0;
+                            completionTokensActual = (chunk as any).outputTokens || 0;
+                        }
                     }
+                } catch (aiErr) {
+                    if (handleProviderRateLimit(aiErr, sendSSE, 'anthropic', userId)) {
+                        endStream();
+                        return;
+                    }
+                    throw aiErr;
                 }
             } else {
-                const stream = await openai.chat.completions.create({
-                    model: model,
-                    messages: conversationHistory,
-                    stream: true,
-                    stream_options: { include_usage: true },
-                    max_completion_tokens: 4096,
-                    temperature: 0.7
-                });
+                try {
+                    const stream = await openai.chat.completions.create({
+                        model: model,
+                        messages: conversationHistory,
+                        stream: true,
+                        stream_options: { include_usage: true },
+                        max_completion_tokens: 4096,
+                        temperature: 0.7
+                    });
 
-                for await (const chunk of stream) {
-                    const content = chunk.choices[0]?.delta?.content || '';
-                    if (content) {
-                        fullResponse += content;
-                        chunkCount++;
-                        sendSSE({ type: 'chunk', content, sessionId: chatSession.id, chunkIndex: chunkCount });
+                    for await (const chunk of stream) {
+                        const content = chunk.choices[0]?.delta?.content || '';
+                        if (content) {
+                            fullResponse += content;
+                            chunkCount++;
+                            sendSSE({ type: 'chunk', content, sessionId: chatSession.id, chunkIndex: chunkCount });
+                        }
+                        // Capture usage from the final chunk (OpenAI sends it in the last event)
+                        if (chunk.usage) {
+                            promptTokensActual = chunk.usage.prompt_tokens || 0;
+                            completionTokensActual = chunk.usage.completion_tokens || 0;
+                        }
                     }
-                    // Capture usage from the final chunk (OpenAI sends it in the last event)
-                    if (chunk.usage) {
-                        promptTokensActual = chunk.usage.prompt_tokens || 0;
-                        completionTokensActual = chunk.usage.completion_tokens || 0;
+                } catch (aiErr) {
+                    if (handleProviderRateLimit(aiErr, sendSSE, 'openai', userId)) {
+                        endStream();
+                        return;
                     }
+                    throw aiErr;
                 }
             }
 

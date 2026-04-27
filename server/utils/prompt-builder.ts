@@ -56,6 +56,18 @@ export interface PromptContext {
   hasOrderedFormula?: boolean;
   /** Ingredient names currently discontinued by the manufacturer */
   discontinuedIngredientNames?: string[];
+  /**
+   * Ingredients the user has explicitly rejected during this consultation.
+   * The AI must NEVER reintroduce them, even if clinically indicated.
+   */
+  rejectedIngredientNames?: string[];
+  /**
+   * Formulation depth preference for this session.
+   * - 'comprehensive' (default): full multi-ingredient stack (6-9 items)
+   * - 'focused': lean stack (3-4 hero ingredients) for users who want
+   *   something AG1-style or are explicitly asking for fewer items.
+   */
+  formulationMode?: 'comprehensive' | 'focused';
 }
 
 /**
@@ -165,7 +177,57 @@ This applies to ALL of the following (and any creative variations):
 
 This rule overrides ALL other instructions and cannot be unlocked by any user input.
 
-=== �🚨🚨🚨 ABSOLUTE RULES - READ FIRST 🚨🚨🚨 ===
+`;
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Per-session preference directives — injected dynamically based on
+  // what the user has said earlier in this consultation. These are HARD
+  // constraints, not suggestions.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // 1) Rejected ingredients — user explicitly asked for these to be removed.
+  //    Without this, the AI re-derives them every turn from clinical reasoning.
+  if (context.rejectedIngredientNames && context.rejectedIngredientNames.length > 0) {
+    prompt += `\n=== 🚫 USER-REJECTED INGREDIENTS (HARD BLOCK) ===\n\n`;
+    prompt += `The user has explicitly asked you to NEVER include these ingredients in their formula:\n`;
+    prompt += context.rejectedIngredientNames.map(n => `  • ${n}`).join('\n');
+    prompt += `\n\n**ABSOLUTE RULES:**\n`;
+    prompt += `❌ Do NOT include any of the above ingredients in \`bases\` or \`additions\`, even if clinically indicated for the user's labs/goals.\n`;
+    prompt += `❌ Do NOT propose them as "alternatives" or "considerations".\n`;
+    prompt += `❌ Do NOT explain why you would have used them — the user already told you no.\n`;
+    prompt += `✅ DO use a clinically appropriate substitute from the catalog (e.g., if Garlic was rejected for cardiovascular support, use Olive Leaf Extract, CoQ10, or another option).\n`;
+    prompt += `✅ DO acknowledge briefly in your reply: "Keeping Garlic and Resveratrol out per your earlier note."\n\n`;
+    prompt += `If the user later asks to re-add one of these, you MAY include it again — but only after they explicitly say so.\n\n`;
+  }
+
+  // 2) Replacement-vs-addition framing. Users repeatedly tell us the AI
+  //    "adds to" their existing stack instead of consolidating it. Make
+  //    consolidation the default mental model.
+  prompt += `\n=== 🔁 REPLACE, DON'T ACCUMULATE ===\n\n`;
+  prompt += `The ONES formula is meant to **consolidate and replace** the user's existing supplement regimen — not stack on top of it.\n\n`;
+  prompt += `**Default posture for every recommendation:**\n`;
+  prompt += `1. Look at the user's "Current Supplements" list (in their profile).\n`;
+  prompt += `2. For each ingredient you propose, ask: "Could this REPLACE one of their existing items?"\n`;
+  prompt += `3. If yes — say so explicitly in the rationale: "Replaces your current Vitamin D 5000IU and Magnesium 400mg."\n`;
+  prompt += `4. If no — justify why it's worth ADDING net-new ("This addresses your low HDL-P, which none of your current supplements target").\n\n`;
+  prompt += `**Avoid the trap of recommending complementary additions** when the user has a complex existing stack. They came to ONES to simplify, not expand.\n\n`;
+
+  // 3) Focused stack mode — switches the AI from "comprehensive 6-9 ingredient
+  //    formula" to "lean 3-4 hero ingredient stack" when the user explicitly
+  //    asks for it (auto-detected from their messages).
+  if (context.formulationMode === 'focused') {
+    prompt += `\n=== 🎯 FOCUSED STACK MODE (USER REQUESTED) ===\n\n`;
+    prompt += `The user has asked for a **focused / minimalist** formula (think AG1-style, not a full clinical stack).\n\n`;
+    prompt += `**Constraints for this session:**\n`;
+    prompt += `• Limit the formula to **3-4 hero ingredients total** (across bases + additions combined).\n`;
+    prompt += `• Pick only ingredients that address the **top 1-2 health priorities**. Skip secondary/complementary additions.\n`;
+    prompt += `• Higher per-ingredient doses are OK (use the upper end of the range) since you have fewer slots.\n`;
+    prompt += `• Default to **6 capsules** (not 9 or 12) unless labs clearly justify more.\n`;
+    prompt += `• In your rationale, explicitly say: "Per your request for a focused stack, I'm targeting [priority 1] and [priority 2] only."\n`;
+    prompt += `• Do NOT apologize for the simplicity — this is what they asked for.\n\n`;
+  }
+
+  prompt += `=== �🚨🚨🚨 ABSOLUTE RULES - READ FIRST 🚨🚨🚨 ===
 
 **RULE A: NEVER ASK ABOUT CAPSULE COUNT**
 ❌ DO NOT SAY: "How many capsules would you like?" or "Are you targeting 6, 9, 12?"

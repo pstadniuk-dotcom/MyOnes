@@ -1147,6 +1147,23 @@ export default function ConsultationPage() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        if (response.status === 429) {
+          // Server-side per-user rate limit hit (different from upstream provider 429).
+          // Try to read retry-after seconds from the JSON body.
+          let retrySec = 30;
+          try {
+            const body = await response.json();
+            if (body?.retryAfter) retrySec = Math.max(5, Math.min(120, Number(body.retryAfter)));
+          } catch { /* ignore */ }
+          toast({
+            title: "You're chatting fast!",
+            description: `Please wait ${retrySec}s before sending another message.`,
+            variant: "default"
+          });
+          setIsTyping(false);
+          setActiveStreamingMessageId(null);
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -1351,6 +1368,29 @@ export default function ConsultationPage() {
                     description: data.message,
                     variant: "default"
                   });
+                } else if (data.type === 'rate_limit') {
+                  // AI provider hit a 429 — show a friendly message + auto-retry once.
+                  console.warn('AI rate limit hit:', data);
+                  const retryMs = Math.min(Math.max(Number(data.retryAfterMs) || 15000, 5000), 60000);
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === aiMessageId
+                      ? { ...msg, content: removeJsonBlocks(accumulatedContent) + `\n\n⏳ *AI is briefly busy. Auto-retrying in ${Math.round(retryMs / 1000)}s…*`, isError: false }
+                      : msg
+                  ));
+                  toast({
+                    title: "AI is briefly busy",
+                    description: data.message || `Retrying in ${Math.round(retryMs / 1000)}s… your message is safe.`,
+                    variant: "default"
+                  });
+                  // Pull the user's last message and re-send after the backoff.
+                  // We capture currentMessage from closure so this works for both the initial send
+                  // and any subsequent retry.
+                  setIsTyping(false);
+                  setActiveStreamingMessageId(null);
+                  completed = true;
+                  setTimeout(() => {
+                    handleSendMessage(currentMessage);
+                  }, retryMs);
                 } else if (data.type === 'error') {
                   console.error('AI Stream error:', data.error);
                   setMessages(prev => prev.map(msg =>
@@ -2260,6 +2300,22 @@ export default function ConsultationPage() {
                   setActiveStreamingMessageId(null);
                   setSelectingCapsuleMessageId(null);
                   completed = true;
+                } else if (data.type === 'rate_limit') {
+                  console.warn('💊 AI rate limit hit:', data);
+                  const retryMs = Math.min(Math.max(Number(data.retryAfterMs) || 15000, 5000), 60000);
+                  toast({
+                    title: "AI is briefly busy",
+                    description: data.message || `Retrying in ${Math.round(retryMs / 1000)}s…`,
+                    variant: "default"
+                  });
+                  setIsTyping(false);
+                  setActiveStreamingMessageId(null);
+                  setSelectingCapsuleMessageId(null);
+                  completed = true;
+                  // For the capsule-selection flow, just retry the same selection
+                  setTimeout(() => {
+                    handleCapsuleSelection(messageId, capsuleCount);
+                  }, retryMs);
                 } else if (data.type === 'error') {
                   console.error('💊 SSE error:', data.error);
                   setMessages(prev => prev.map(msg =>

@@ -43,6 +43,31 @@ export class ChatRepository {
         return session || undefined;
     }
 
+    /**
+     * Update the per-session preference fields tracked across chat turns:
+     *   - rejectedIngredients: ingredients the user explicitly removed
+     *   - formulationMode:     'comprehensive' | 'focused'
+     *
+     * Either field is optional; pass only what changed. Returns the updated row.
+     */
+    async updateSessionPreferences(
+        id: string,
+        prefs: { rejectedIngredients?: string[]; formulationMode?: string }
+    ): Promise<ChatSession | undefined> {
+        const updates: Record<string, unknown> = {};
+        if (prefs.rejectedIngredients !== undefined) updates.rejectedIngredients = prefs.rejectedIngredients;
+        if (prefs.formulationMode !== undefined) updates.formulationMode = prefs.formulationMode;
+        if (Object.keys(updates).length === 0) {
+            return this.getChatSession(id);
+        }
+        const [session] = await db
+            .update(chatSessions)
+            .set(updates)
+            .where(eq(chatSessions.id, id))
+            .returning();
+        return session || undefined;
+    }
+
     async createMessage(insertMessage: any): Promise<Message> {
         // Encrypt message content (PHI) before storage
         const encryptedMessage = {

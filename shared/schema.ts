@@ -264,6 +264,15 @@ export const chatSessions = pgTable("chat_sessions", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }),
   status: chatStatusEnum("status").default('active').notNull(),
+  // Ingredients the user has explicitly rejected during this consultation.
+  // The AI must NEVER include these in subsequent formula iterations,
+  // even if clinically indicated. Persisted across turns so "remove garlic"
+  // sticks across regenerations.
+  rejectedIngredients: json("rejected_ingredients").$type<string[]>().default([]).notNull(),
+  // User's preferred formulation style for this session — set when they ask
+  // for a "focused" or "minimal" stack (e.g., "like AG1"). Influences AI
+  // depth/breadth choices.
+  formulationMode: varchar("formulation_mode", { length: 32 }).default('comprehensive').notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("chat_sessions_user_id_idx").on(table.userId),
@@ -905,6 +914,8 @@ export const insertHealthProfileSchema = createInsertSchema(healthProfiles).omit
 export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
   id: true,
   createdAt: true,
+  rejectedIngredients: true,
+  formulationMode: true,
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({
