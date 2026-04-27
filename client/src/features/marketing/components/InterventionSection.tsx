@@ -453,7 +453,14 @@ useEffect(() => {
 
   const tryPlay = () => {
     if (!v.paused) return;
-    v.play().catch(() => setMobileVideoBlocked(true));
+    const playPromise = v.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        if (err.name === 'AbortError') return;
+        console.warn('Video play blocked:', err);
+        setMobileVideoBlocked(true);
+      });
+    }
   };
 
   ['loadeddata', 'canplay', 'canplaythrough'].forEach(e =>
@@ -510,11 +517,11 @@ useEffect(() => {
            <video
               ref={mobileVideoRef}
               src="/capsule-formation.mp4"
-              autoPlay
               loop
               muted
               playsInline
-              preload="auto"              
+              preload="auto"
+              disablePictureInPicture
               style={{ aspectRatio: '1 / 1' }}
               className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
             />
