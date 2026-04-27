@@ -528,29 +528,16 @@ export function OnesDifferenceSection() {
                     muted
                     playsInline
                     preload="auto"
+                    disablePictureInPicture
                     disableRemotePlayback
+                    controls={false}
+                    controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
+                    x-webkit-airplay="deny"
                     style={{ aspectRatio: '1 / 1' }}
-                    className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
+                    className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover pointer-events-none select-none"
                   >
                     <source src="/capsule-formation.mp4" type="video/mp4" />
                   </video>
-                  {mobileVideoBlocked && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const v = mobileVideoRef.current;
-                        if (!v) return;
-                        v.muted = true;
-                        v.play().then(() => setMobileVideoBlocked(false)).catch(() => {});
-                      }}
-                      aria-label="Play capsule formation video"
-                      className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
-                    >
-                      <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]"><path d="M8 5v14l11-7z" /></svg>
-                      </span>
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -624,7 +611,19 @@ export function OnesDifferenceSection() {
               {/* Center Video with glow */}
               <motion.div variants={scaleIn} className="relative flex items-center justify-center">
                 <div className="absolute inset-0 -inset-x-12 -inset-y-12 bg-[radial-gradient(circle,_rgba(138,154,44,0.1)_0%,_transparent_65%)]" />
-                <video autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-3xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.15),_0_0_0_1px_rgba(255,255,255,0.3)]">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
+                  disablePictureInPicture
+                  disableRemotePlayback
+                  controls={false}
+                  controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
+                  x-webkit-airplay="deny"
+                  className="relative w-full h-auto rounded-3xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.15),_0_0_0_1px_rgba(255,255,255,0.3)] object-cover pointer-events-none select-none"
+                >
                   <source src="/capsule-formation.mp4" type="video/mp4" />
                 </video>
               </motion.div>

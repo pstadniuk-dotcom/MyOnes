@@ -175,7 +175,7 @@ export default function ProblemFlowSection() {
               return (
                 <div
                   key={t.label}
-                  className={`relative transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  className={`relative transition-all [transition-duration:600ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
                     isActive ? "flex-[2.2]" : "flex-1"
                   } ${
                     revealed
@@ -241,7 +241,7 @@ export default function ProblemFlowSection() {
 
                     {/* Expanded description — only on active card */}
                     <div
-                      className={`transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                      className={`transition-all [transition-duration:400ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
                         isActive
                           ? "max-h-40 opacity-100 mt-4"
                           : "max-h-0 opacity-0 mt-0"
