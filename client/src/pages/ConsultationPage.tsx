@@ -786,43 +786,63 @@ export default function ConsultationPage() {
 
     const { scrollTop, scrollHeight, clientHeight } = viewport;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    // Consider "near bottom" if within 150px of the bottom
-    return distanceFromBottom < 150;
+    // Re-engage auto-scroll only when user is essentially at the bottom (within ~60px).
+    // Keep this tight so we don't yank the user back while they're trying to read.
+    return distanceFromBottom < 60;
   }, []);
 
-  // Handle scroll events to track if user scrolled up
+  // Handle scroll events to track if user scrolled up.
+  // Strategy: any meaningful upward movement away from the bottom locks auto-scroll.
+  // We do NOT require `isUserScrolling` to be true here, because that flag is racy on
+  // mobile (momentum scroll) and trackpads (gaps between wheel events) — relying on it
+  // caused the bug where the AI's streaming response would shoot the user back down
+  // mid-read.
   const handleScroll = useCallback(() => {
     const viewport = scrollViewportRef.current;
     if (!viewport) return;
 
-    const currentScrollTop = viewport.scrollTop;
+    const { scrollTop, scrollHeight, clientHeight } = viewport;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
-    // If user is actively scrolling (touch/wheel) and scrolled up, mark as scrolled up
-    if (isUserScrolling.current && currentScrollTop < lastScrollTop.current - 10) {
+    // If we're noticeably away from the bottom, lock auto-scroll. The threshold (40px)
+    // is intentionally small so any deliberate scroll-up is respected immediately.
+    // Programmatic auto-scrolls land at distanceFromBottom ~= 0, so they don't trip this.
+    if (distanceFromBottom > 40) {
       userHasScrolledUp.current = true;
-    }
-
-    // If user scrolls back to near bottom, re-enable auto-scroll
-    if (isNearBottom()) {
+    } else if (distanceFromBottom < 8) {
+      // Only re-enable auto-scroll when the user has effectively returned to the bottom.
       userHasScrolledUp.current = false;
     }
 
-    lastScrollTop.current = currentScrollTop;
-  }, [isNearBottom]);
+    lastScrollTop.current = scrollTop;
+  }, []);
 
-  // Handle user-initiated scroll (touch or wheel) to differentiate from programmatic scrolls
+  // Handle user-initiated scroll (touch or wheel). On any user gesture we eagerly
+  // mark them as "scrolled up" unless they're already at the bottom — this prevents
+  // the streaming auto-scroll from fighting the user during the gesture itself.
   const handleUserScrollStart = useCallback(() => {
     isUserScrolling.current = true;
+
+    const viewport = scrollViewportRef.current;
+    if (viewport) {
+      const { scrollTop, scrollHeight, clientHeight } = viewport;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      if (distanceFromBottom > 8) {
+        userHasScrolledUp.current = true;
+      }
+    }
 
     // Clear any existing timeout
     if (scrollLockTimeout.current) {
       clearTimeout(scrollLockTimeout.current);
     }
 
-    // Reset after 150ms of no scroll activity
+    // Keep the "actively interacting" flag alive for ~1s after the last gesture
+    // event so iOS momentum scroll and slow trackpad scrolls don't get treated as
+    // programmatic scrolls.
     scrollLockTimeout.current = setTimeout(() => {
       isUserScrolling.current = false;
-    }, 150);
+    }, 1000);
   }, []);
 
   // Set up scroll listener on the ScrollArea viewport
