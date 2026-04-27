@@ -48,6 +48,9 @@ export function initPostHog(): void {
     },
     loaded: (ph) => {
       if (import.meta.env.DEV) ph.debug(false);
+      // Expose on window for ad-hoc debugging in any environment.
+      // Lets us run `window.posthog.capture('test')` from DevTools.
+      (window as unknown as { posthog: typeof ph }).posthog = ph;
     },
   });
 
