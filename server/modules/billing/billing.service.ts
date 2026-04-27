@@ -311,7 +311,7 @@ class DatabaseBillingProvider implements BillingProvider {
       : 0;
 
     const totalCents = adjustedFormulaCents + membershipAmountCents + adjustedShippingCents;
-    if (!Number.isFinite(totalCents) || totalCents <= 0) {
+    if (!Number.isFinite(totalCents) || totalCents < 0) {
       logger.error('Invalid checkout totalCents computed', {
         userId,
         formulaLineAmountCents,
@@ -324,6 +324,10 @@ class DatabaseBillingProvider implements BillingProvider {
       await releaseDiscountIfReserved();
       throw new Error('CHECKOUT_TOTAL_INVALID');
     }
+    // A 100%-off discount can legitimately drive the total to $0. We skip the
+    // EPD charge in that case (there's nothing to charge) and complete the
+    // order as a comp.
+    const isZeroDollarOrder = totalCents === 0;
     const totalDollars = (totalCents / 100).toFixed(2);
 
     logger.info('Checkout pricing breakdown', {
@@ -352,55 +356,67 @@ class DatabaseBillingProvider implements BillingProvider {
     const billing = payload.billingAddress || shipping;
 
     // ── Charge via EPD (sale + vault the card) ──
-    let epdResult: EpdTransactionResponse;
-    try {
-      epdResult = await epdGateway.sale({
-        amount: totalDollars,
-        payment_token: paymentToken,
-        customer_vault: 'add_customer',
-        stored_credential_indicator: 'stored',
-        initiated_by: 'customer',
-        orderid: `ones-${userId.slice(0, 8)}-${Date.now()}`,
-        orderdescription,
-        first_name: billing?.firstName || user.name?.split(' ')[0] || undefined,
-        last_name: billing?.lastName || user.name?.split(' ').slice(1).join(' ') || undefined,
-        email: user.email,
-        phone: user.phone || undefined,
-        address1: billing?.line1,
-        address2: billing?.line2,
-        city: billing?.city,
-        state: billing?.state,
-        zip: billing?.zip,
-        country: billing?.country || 'US',
-        shipping_firstname: shipping?.firstName,
-        shipping_lastname: shipping?.lastName,
-        shipping_address1: shipping?.line1,
-        shipping_address2: shipping?.line2,
-        shipping_city: shipping?.city,
-        shipping_state: shipping?.state,
-        shipping_zip: shipping?.zip,
-        shipping_country: shipping?.country || 'US',
-        customer_receipt: 'true',
-      });
-    } catch (err) {
-      logger.error('EPD sale request failed', { userId, error: err });
-      await releaseDiscountIfReserved();
-      throw new Error('PAYMENT_PROCESSING_ERROR');
-    }
+    // Skipped when the order total is $0 (e.g. 100% off comp). In that case
+    // there's no card transaction to make, no vault to create, and we synth
+    // a transactionId so downstream order-creation still has something to log.
+    let epdResult: EpdTransactionResponse | null = null;
+    if (!isZeroDollarOrder) {
+      try {
+        epdResult = await epdGateway.sale({
+          amount: totalDollars,
+          payment_token: paymentToken,
+          customer_vault: 'add_customer',
+          stored_credential_indicator: 'stored',
+          initiated_by: 'customer',
+          orderid: `ones-${userId.slice(0, 8)}-${Date.now()}`,
+          orderdescription,
+          first_name: billing?.firstName || user.name?.split(' ')[0] || undefined,
+          last_name: billing?.lastName || user.name?.split(' ').slice(1).join(' ') || undefined,
+          email: user.email,
+          phone: user.phone || undefined,
+          address1: billing?.line1,
+          address2: billing?.line2,
+          city: billing?.city,
+          state: billing?.state,
+          zip: billing?.zip,
+          country: billing?.country || 'US',
+          shipping_firstname: shipping?.firstName,
+          shipping_lastname: shipping?.lastName,
+          shipping_address1: shipping?.line1,
+          shipping_address2: shipping?.line2,
+          shipping_city: shipping?.city,
+          shipping_state: shipping?.state,
+          shipping_zip: shipping?.zip,
+          shipping_country: shipping?.country || 'US',
+          customer_receipt: 'true',
+        });
+      } catch (err) {
+        logger.error('EPD sale request failed', { userId, error: err });
+        await releaseDiscountIfReserved();
+        throw new Error('PAYMENT_PROCESSING_ERROR');
+      }
 
-    if (!isApproved(epdResult)) {
-      logger.warn('EPD payment declined', {
+      if (!isApproved(epdResult)) {
+        logger.warn('EPD payment declined', {
+          userId,
+          response: epdResult.response,
+          responsetext: epdResult.responsetext,
+          response_code: epdResult.response_code,
+        });
+        await releaseDiscountIfReserved();
+        throw new Error(`PAYMENT_DECLINED: ${epdResult.responsetext}`);
+      }
+    } else {
+      logger.info('Zero-dollar checkout (100% discount) — skipping EPD charge', {
         userId,
-        response: epdResult.response,
-        responsetext: epdResult.responsetext,
-        response_code: epdResult.response_code,
+        codeDiscountCents,
+        discountCode: payload.discountCode || undefined,
       });
-      await releaseDiscountIfReserved();
-      throw new Error(`PAYMENT_DECLINED: ${epdResult.responsetext}`);
     }
 
-    const vaultId = epdResult.customer_vault_id;
-    const transactionId = epdResult.transactionid;
+    const vaultId = epdResult?.customer_vault_id;
+    const transactionId = epdResult?.transactionid
+      || (isZeroDollarOrder ? `comp-${userId.slice(0, 8)}-${Date.now()}` : undefined);
 
     // ── Save vault ID to user ──
     await usersRepository.updateUser(userId, {
