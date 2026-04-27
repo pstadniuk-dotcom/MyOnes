@@ -108,7 +108,7 @@ export default function InterventionSection() {
   const problemRef = useRef<HTMLElement>(null);
   const solutionRef = useRef<HTMLElement>(null);
   const problemInView = useInView(problemRef, { once: true, margin: "-80px" });
-  const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
+  const solutionInView = useInView(solutionRef, { once: true, margin: "-50px" });
   const [, navigate] = useLocation();
 
   return (
@@ -241,27 +241,29 @@ export default function InterventionSection() {
           </motion.div>
 
           {/* Video + Ingredient Cards */}
+          {/* Video + Ingredient Cards */}
+          {/* ── Mobile Video (Always visible, no stagger animation) ── */}
+          <div className="md:hidden flex justify-center mb-8">
+            <div className="relative w-full max-w-sm">
+              <video
+                src="/capsule-formation.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                className="relative w-full h-auto rounded-2xl shadow-xl"
+              />
+            </div>
+          </div>
+
           <motion.div
             initial="hidden"
             animate={solutionInView ? "visible" : "hidden"}
             variants={stagger}
           >
-            {/* ── Mobile Layout ── */}
+            {/* ── Mobile Cards ── */}
             <div className="md:hidden">
-              <motion.div variants={scaleIn} className="flex justify-center mb-8">
-                <div className="relative w-full max-w-sm">
-                  <video
-                    src="/capsule-formation.mp4"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="auto"
-                    className="relative w-full h-auto rounded-2xl shadow-xl"
-                  />
-                </div>
-              </motion.div>
-
               <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
                 {callouts.map((callout, i) => (
                   <motion.div
@@ -428,7 +430,7 @@ export default function InterventionSection() {
 
 export function OnesDifferenceSection() {
   const solutionRef = useRef<HTMLElement>(null);
-  const solutionInView = useInView(solutionRef, { once: true, margin: "100px" });
+  const solutionInView = useInView(solutionRef, { once: true, margin: "-50px" });
   const [, navigate] = useLocation();
   const mobileVideoRef = useRef<HTMLVideoElement>(null);
   const [mobileVideoBlocked, setMobileVideoBlocked] = useState(false);
@@ -521,51 +523,56 @@ export function OnesDifferenceSection() {
           </motion.div>
 
           {/* Video + Ingredient Cards */}
-          <div>
-            {/* ── Mobile Layout ── */}
-            <div className="md:hidden">
-              <div className="flex justify-center mb-8">
-                <div className="relative w-full max-w-sm">
-                  {/* Radial glow behind video */}
-                  <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
-                  <video
-                    ref={mobileVideoRef}
-                    src="/capsule-formation.mp4"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="auto"
-                    onCanPlay={() => {
-                      if (mobileVideoRef.current?.paused) tryPlay();
-                    }}
-                    style={{ aspectRatio: '1 / 1' }}
-                    className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-                  />
-                  {mobileVideoBlocked && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const v = mobileVideoRef.current;
-                        if (!v) return;
-                        v.muted = true;
-                        // On Android, v.load() is often necessary to 'wake up' the stream after a system block
-                        v.load();
-                        v.play()
-                          .then(() => setMobileVideoBlocked(false))
-                          .catch((err) => console.error("Manual play failed", err));
-                      }}
-                      aria-label="Play capsule formation video"
-                      className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
-                    >
-                      <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]"><path d="M8 5v14l11-7z" /></svg>
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </div>
+          {/* ── Mobile Video (Always visible, no stagger animation) ── */}
+          <div className="md:hidden flex justify-center mb-8">
+            <div className="relative w-full max-w-sm">
+              {/* Radial glow behind video */}
+              <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
+              <video
+                ref={mobileVideoRef}
+                src="/capsule-formation.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                onCanPlay={() => {
+                  if (mobileVideoRef.current?.paused) tryPlay();
+                }}
+                style={{ aspectRatio: '1 / 1' }}
+                className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
+              />
+              {mobileVideoBlocked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = mobileVideoRef.current;
+                    if (!v) return;
+                    v.muted = true;
+                    // On Android, v.load() is often necessary to 'wake up' the stream after a system block
+                    v.load();
+                    v.play()
+                      .then(() => setMobileVideoBlocked(false))
+                      .catch((err) => console.error("Manual play failed", err));
+                  }}
+                  aria-label="Play capsule formation video"
+                  className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
+                >
+                  <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+                    <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]"><path d="M8 5v14l11-7z" /></svg>
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
 
+          <motion.div
+            initial="hidden"
+            animate={solutionInView ? "visible" : "hidden"}
+            variants={stagger}
+          >
+            {/* ── Mobile Cards ── */}
+            <div className="md:hidden">
               <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
                 {callouts.map((callout, i) => (
                   <motion.div
@@ -674,7 +681,7 @@ export function OnesDifferenceSection() {
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* CTA */}
           <motion.div
