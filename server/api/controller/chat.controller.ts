@@ -739,6 +739,7 @@ export class ChatController {
                                     targetMg: baseBudget,
                                     minAcceptableMg: minRequiredMg,
                                     maxAcceptableMg: maxWithTolerance,
+                                    minIngredientCount: FORMULA_LIMITS.MIN_INGREDIENT_COUNT,
                                     rejectedIngredients: mergedRejected,
                                     clinicalContextSummary: clinicalSummary,
                                 },

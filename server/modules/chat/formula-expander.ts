@@ -40,6 +40,9 @@ export interface ExpansionContext {
     /** Tolerance band — anything in [minAcceptable, maxAcceptable] passes. */
     minAcceptableMg: number;
     maxAcceptableMg: number;
+    /** Minimum total ingredient count the safety net expects. If the AI adds
+     *  fewer than (this - currentCount) items, the system filler will fire. */
+    minIngredientCount?: number;
     /** Names the user has explicitly rejected for this session. */
     rejectedIngredients: string[];
     /** Brief summary string of user's clinical profile (goals, key labs). */
@@ -106,28 +109,45 @@ export function buildExpansionPrompt(ctx: ExpansionContext): { system: string; u
     const deficit = ctx.targetMg - ctx.formula.totalMg;
     const minAdd = Math.max(0, ctx.minAcceptableMg - ctx.formula.totalMg);
     const maxAdd = ctx.maxAcceptableMg - ctx.formula.totalMg;
+    // Aim for the middle of the band, not the lower bound. After ingredient-cap
+    // normalization the AI's chosen amounts can shrink (e.g. Omega 3 capped from
+    // 500→391mg), and if we land at exactly the minimum the system safety net
+    // fires and adds a hardcoded filler — which defeats the whole purpose.
+    const idealAdd = Math.round((minAdd + maxAdd) / 2);
+
+    // Count constraint: the safety net also fires if total ingredient count is
+    // below the system minimum (default 8), independent of mg total. Tell the
+    // AI how many items to add so it doesn't trigger that path either.
+    const currentCount = ctx.formula.bases.length + ctx.formula.additions.length;
+    const minCount = ctx.minIngredientCount ?? 8;
+    const minNeeded = Math.max(0, minCount - currentCount);
+    const countLine = minNeeded > 0
+        ? `4. You MUST add at least ${minNeeded} ingredients (current formula has ${currentCount}; system minimum is ${minCount}). Adding fewer will trigger automatic system filler.`
+        : `4. The formula already meets the minimum ingredient count.`;
 
     const system = `You are filling out an existing supplement formula to meet manufacturing capsule-fill requirements.
 
 Every capsule slot must contain content. The formula below is under-budget — your job is to choose ADDITIONAL ingredients that are CLINICALLY RELEVANT to this user's profile (not random filler).
 
 CRITICAL RULES:
-1. Choose 1-4 ingredients that complement the existing formula and address THIS user's stated needs.
+1. Choose ingredients that complement the existing formula and address THIS user's stated needs.
 2. Justify each addition with a brief clinical rationale (one sentence).
-3. The total amount you add must bring the formula into the range ${ctx.minAcceptableMg}-${ctx.maxAcceptableMg}mg (current ${ctx.formula.totalMg}mg, target ${ctx.targetMg}mg, deficit ${deficit}mg).
-4. Use ONLY ingredients from the candidate list below — others will be rejected.
-5. Do NOT include any ingredient already in the current formula or in the user's rejected list.
-6. Output JSON ONLY — no commentary, no markdown fences. Schema:
+3. AIM for total additions of ~${idealAdd}mg (must be between ${minAdd}mg and ${maxAdd}mg). Targeting the middle of the band gives headroom — landing exactly at the minimum risks triggering an automatic system filler.
+${countLine}
+5. Use ONLY ingredients from the candidate list below — others will be rejected.
+6. Do NOT include any ingredient already in the current formula or in the user's rejected list.
+7. Output JSON ONLY — no commentary, no markdown fences. Schema:
 {
   "additions": [
     { "ingredient": "<name>", "amount": <number>, "unit": "mg", "purpose": "<one-sentence clinical reason>" }
   ]
 }`;
 
-    const user = `CURRENT FORMULA (target ${ctx.formula.targetCapsules} capsules, ${ctx.targetMg}mg total budget):
+    const user = `CURRENT FORMULA (target ${ctx.formula.targetCapsules} capsules, ${ctx.targetMg}mg total budget, ${currentCount} ingredients):
 ${currentFormulaText}
 Current total: ${ctx.formula.totalMg}mg
-Need to add between ${minAdd}mg and ${maxAdd}mg of clinically-justified ingredients.
+Need to add ~${idealAdd}mg of clinically-justified ingredients (acceptable range ${minAdd}-${maxAdd}mg, but aim for the middle).
+${minNeeded > 0 ? `Need to add at least ${minNeeded} ingredients to reach the system minimum of ${minCount}.` : ''}
 
 USER'S CLINICAL CONTEXT:
 ${ctx.clinicalContextSummary || '(no specific context provided — choose broadly supportive ingredients)'}
