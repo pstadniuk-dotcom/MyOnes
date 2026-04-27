@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Moon, TestTube, HeartPulse, Activity, Leaf, Zap, ArrowRight } from "lucide-react";
 import { motion, useInView } from "framer-motion";
 import { useLocation } from "wouter";
@@ -442,58 +442,30 @@ export function OnesDifferenceSection() {
   // We also gate every play() on `paused` so we never overlap the browser's own autoplay
   // attempt (overlapping play() calls reject the first promise with AbortError, which used
   // to spuriously flip blocked=true).
-  const tryPlay = useCallback(async () => {
-    const v = mobileVideoRef.current;
-    if (!v || !v.paused) return;
-    try {
-      await v.play();
-      setMobileVideoBlocked(false);
-    } catch (err: any) {
-      // AbortError is common and safe to ignore
-      if (err && err.name === 'AbortError') return;
-      
-      console.warn("Mobile video autoplay blocked:", err);
-      setMobileVideoBlocked(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    const v = mobileVideoRef.current;
-    if (!v) return;
-
-    // Ensure muted is set early and explicitly
-    v.muted = true;
-    v.defaultMuted = true;
-
-    // If already ready (HAVE_FUTURE_DATA or better), try playing immediately
-    if (v.readyState >= 3) {
-      tryPlay();
-    }
-
-    // Listen for all events that indicate the video is ready to attempt playback
-    const events = ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough'];
-    events.forEach(event => v.addEventListener(event, tryPlay));
-
-    const onVis = () => { 
-      if (!document.hidden && v.paused) {
-        // A small delay helps some mobile browsers recover from backgrounding
-        setTimeout(tryPlay, 100);
-      }
-    };
-    document.addEventListener('visibilitychange', onVis);
-
-    return () => {
-      events.forEach(event => v.removeEventListener(event, tryPlay));
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, [tryPlay]);
-  const attemptPlay = useCallback(() => {
+ 
+useEffect(() => {
   const v = mobileVideoRef.current;
   if (!v) return;
-  v.muted = true; 
-  v.play()
-    .then(() => setMobileVideoBlocked(false))
-    .catch(() => setMobileVideoBlocked(true)); 
+
+  v.muted = true;          // imperative — beats React's render timing
+  v.defaultMuted = true;
+  v.setAttribute('playsinline', '');   // belt-and-suspenders for iOS Safari
+
+  const tryPlay = () => {
+    if (!v.paused) return;
+    v.play().catch(() => setMobileVideoBlocked(true));
+  };
+
+  ['loadeddata', 'canplay', 'canplaythrough'].forEach(e =>
+    v.addEventListener(e, tryPlay)
+  );
+  tryPlay(); // attempt immediately if already ready
+
+  return () => {
+    ['loadeddata', 'canplay', 'canplaythrough'].forEach(e =>
+      v.removeEventListener(e, tryPlay)
+    );
+  };
 }, []);
 
   return (
@@ -536,35 +508,31 @@ export function OnesDifferenceSection() {
             <div className="relative w-full max-w-sm">
               <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
            <video
-      ref={mobileVideoRef}
-      src="/capsule-formation.mp4"
-      autoPlay
-      loop
-      muted
-      playsInline
-      webkit-playsinline="true"    // iOS Safari legacy
-      x5-playsinline="true"        // Android WebView
-      preload="metadata"           // ← was "auto", mobile blocks that
-      onLoadedMetadata={attemptPlay}  // earliest safe moment to call play()
-      onCanPlay={attemptPlay}         // fallback if metadata fires without data
-      style={{ aspectRatio: '1 / 1' }}
-      className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-    />
+              ref={mobileVideoRef}
+              src="/capsule-formation.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"              
+              style={{ aspectRatio: '1 / 1' }}
+              className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
+            />
               {mobileVideoBlocked && (
                  <button
-        type="button"
-        onClick={() => {
-          const v = mobileVideoRef.current;
-          if (!v) return;
-          v.muted = true;
-          v.load();  // Android needs this
-          // Wait for load to settle before playing
-          v.oncanplay = () => {
-            v.play()
-              .then(() => {
-                setMobileVideoBlocked(false);
-                v.oncanplay = null; // clean up
-              })
+                type="button"
+                onClick={() => {
+                  const v = mobileVideoRef.current;
+                  if (!v) return;
+                  v.muted = true;
+                  v.load();  // Android needs this
+                  // Wait for load to settle before playing
+                  v.oncanplay = () => {
+                    v.play()
+                      .then(() => {
+                        setMobileVideoBlocked(false);
+                        v.oncanplay = null; // clean up
+                      })
               .catch((err) => console.error("Manual play failed", err));
           };
         }}
