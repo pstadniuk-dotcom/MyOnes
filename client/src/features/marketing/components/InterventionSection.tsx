@@ -432,6 +432,13 @@ export function OnesDifferenceSection() {
   const solutionRef = useRef<HTMLElement>(null);
   const solutionInView = useInView(solutionRef, { once: true, margin: "-50px" });
   const [, navigate] = useLocation();
+  
+
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+
+    useEffect(() => {
+      videoRef.current?.play().catch(console.log);
+    }, []);
 
 
   return (
@@ -474,14 +481,10 @@ export function OnesDifferenceSection() {
             <div className="relative w-full max-w-sm">
               <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
               <video
+                ref={videoRef}
                 src="/capsule-formation.mp4"
                 autoPlay
-                loop
                 muted
-                playsInline
-                preload="auto"
-                disablePictureInPicture
-                controlsList="noplaybackrate nodownload"
                 style={{ aspectRatio: '1 / 1' }}
                 className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
               />
