@@ -1,12 +1,13 @@
 import posthog from 'posthog-js';
 
 const KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-// In production we route through the same-origin reverse proxy defined in
-// vercel.json (/ingest/* → us.i.posthog.com) so ad-blockers don't drop events.
-// In dev we hit PostHog directly because Vite's dev server has no rewrite.
+// We talk to PostHog directly. The /ingest reverse-proxy in vercel.json only
+// applies on Vercel; production runs on Render which has no such rewrite, so
+// the proxy returned 404s and the recorder bundle never loaded. Direct hosts
+// can be ad-blocked but actually deliver session replay; the proxy was a no-op.
 const HOST =
   (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ??
-  (import.meta.env.DEV ? 'https://us.i.posthog.com' : '/ingest');
+  'https://us.i.posthog.com';
 const UI_HOST = 'https://us.posthog.com';
 
 let initialized = false;
