@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
 import { usersRepository } from '../modules/users/users.repository';
 import { notificationsService } from '../modules/notifications/notifications.service';
 import { formulasRepository } from '../modules/formulas/formulas.repository';
@@ -267,12 +268,20 @@ async function checkAndSendRenewalReminders() {
 export function startSmsReminderScheduler() {
   logger.info('SMS reminder scheduler starting');
 
+  // Per-minute delivery loop. alertOnFailure=false because individual SMS sends
+  // can transiently fail (e.g. throttling) and we don't want minute-by-minute emails.
   cron.schedule('* * * * *', async () => {
-    await checkAndSendReminders();
+    await runScheduledJob('sms_reminder', async () => {
+      await checkAndSendReminders();
+      return { subtask: 'delivery_loop' };
+    }, 'cron', { alertOnFailure: false });
   });
 
   cron.schedule('0 12 * * *', async () => {
-    await checkAndSendRenewalReminders();
+    await runScheduledJob('sms_reminder', async () => {
+      await checkAndSendRenewalReminders();
+      return { subtask: 'renewal_reminders' };
+    });
   });
 
   cron.schedule('0 0 * * *', () => {

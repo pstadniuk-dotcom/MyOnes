@@ -13,6 +13,7 @@ import cron from 'node-cron';
 import { reorderRepository } from '../modules/reorder/reorder.repository';
 import { reorderService } from '../modules/reorder/reorder.service';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
 
 const REVIEW_DAYS_BEFORE = 5;
 
@@ -100,17 +101,26 @@ export function startSmartReorderScheduler() {
 
   // 1. Review job — daily at 7am UTC (before auto-ship scheduler at 8am)
   cron.schedule('0 7 * * *', async () => {
-    await processScheduleReviews();
+    await runScheduledJob('smart_reorder', async () => {
+      const summary = await processScheduleReviews();
+      return { subtask: 'review', ...summary };
+    });
   });
 
   // 2. Auto-approve job — every 4 hours
   cron.schedule('0 */4 * * *', async () => {
-    await processAutoApprovals();
+    await runScheduledJob('smart_reorder', async () => {
+      const autoApproved = await processAutoApprovals();
+      return { subtask: 'auto_approve', autoApproved };
+    });
   });
 
   // 3. Charge job — daily at 10am UTC
   cron.schedule('0 10 * * *', async () => {
-    await processCharges();
+    await runScheduledJob('smart_reorder', async () => {
+      const charged = await processCharges();
+      return { subtask: 'charge', charged };
+    });
   });
 
   logger.info('[SmartReorder] Scheduler started — review 7am UTC, auto-approve every 4h, charge 10am UTC');

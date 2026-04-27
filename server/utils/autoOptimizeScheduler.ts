@@ -20,6 +20,7 @@ import { usersRepository } from '../modules/users/users.repository';
 import { formulaReviewService } from '../modules/formulas/formula-review.service';
 import { notificationGate } from '../modules/notifications/notification-gate.service';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
 
 /**
  * Notify users whose renewal is exactly `daysAhead` days away
@@ -101,7 +102,10 @@ export function startAutoOptimizeScheduler() {
 
     // Daily at 9am UTC
     cron.schedule('0 9 * * *', async () => {
-        await runFormulaReviewCheck();
+        await runScheduledJob('auto_optimize', async () => {
+            const summary = await runFormulaReviewCheck();
+            return summary as Record<string, any>;
+        });
     });
 
     logger.info('Formula review scheduler: started — runs daily at 09:00 UTC (dedup via notification gate)');

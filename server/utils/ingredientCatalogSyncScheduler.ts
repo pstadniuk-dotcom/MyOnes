@@ -10,18 +10,13 @@
 import cron from 'node-cron';
 import { ingredientCatalogSyncService } from '../modules/formulas/ingredient-catalog-sync.service';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
 
-async function runCatalogSync() {
+async function runCatalogSync(): Promise<Record<string, any>> {
   logger.info('Ingredient catalog sync scheduler: starting daily sync');
-
-  try {
-    const result = await ingredientCatalogSyncService.syncCatalog();
-    logger.info('Ingredient catalog sync scheduler: complete', result);
-  } catch (err) {
-    logger.error('Ingredient catalog sync scheduler: failed', {
-      error: err instanceof Error ? err.message : err,
-    });
-  }
+  const result = await ingredientCatalogSyncService.syncCatalog();
+  logger.info('Ingredient catalog sync scheduler: complete', result);
+  return result as Record<string, any>;
 }
 
 export function startIngredientCatalogSyncScheduler() {
@@ -29,7 +24,7 @@ export function startIngredientCatalogSyncScheduler() {
 
   // Daily at 3am UTC
   cron.schedule('0 3 * * *', async () => {
-    await runCatalogSync();
+    await runScheduledJob('ingredient_catalog_sync', runCatalogSync);
   });
 
   // Also run once on startup (after a short delay) to seed the DB if empty

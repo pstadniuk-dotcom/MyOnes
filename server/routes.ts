@@ -29,7 +29,8 @@ import {
   ugcRoutes,
   metaAdsRoutes,
   brandStudioRoutes,
-  seoRoutes
+  seoRoutes,
+  adminAgentsRoutes
 } from "./api/routes";
 import { initializeAiSettings } from "./infra/ai/ai-config";
 import logger from "./infra/logging/logger";
@@ -89,6 +90,7 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   app.use('/api/admin/ugc', ugcRoutes);
   app.use('/api/admin/meta-ads', metaAdsRoutes);
   app.use('/api/admin/brand-studio', brandStudioRoutes);
+  app.use('/api/admin/agents', adminAgentsRoutes);
   app.use('/api/support', supportRoutes);
   app.use('/api/consents', consentsRoutes);
   app.use('/api/files', filesRoutes);

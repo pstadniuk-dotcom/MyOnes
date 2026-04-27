@@ -14,6 +14,7 @@ import cron from 'node-cron';
 import { autoShipRepository } from '../modules/billing/autoship.repository';
 import { autoShipService } from '../modules/billing/autoship.service';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
 
 const PRE_RENEWAL_DAYS = 10; // Refresh quotes 10 days before renewal
 
@@ -56,7 +57,10 @@ export function startAutoShipScheduler() {
 
   // Daily at 8am UTC — runs before the formula review scheduler (9am)
   cron.schedule('0 8 * * *', async () => {
-    await refreshUpcomingAutoShipQuotes();
+    await runScheduledJob('auto_ship', async () => {
+      const summary = await refreshUpcomingAutoShipQuotes();
+      return summary as Record<string, any>;
+    });
   });
 
   logger.info('Auto-ship pre-renewal scheduler: started — runs daily at 08:00 UTC');

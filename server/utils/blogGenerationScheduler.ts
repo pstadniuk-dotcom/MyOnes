@@ -29,6 +29,7 @@ import { db } from '../infra/db/db';
 import { appSettings } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { pingSitemapIndexers } from './sitemapPing';
+import { runScheduledJob } from './schedulerRunner';
 import fs from 'fs';
 import path from 'path';
 
@@ -304,14 +305,12 @@ export function startBlogGenerationScheduler() {
       return;
     }
 
-    logger.info('[blog-scheduler] Starting scheduled blog generation run');
-
-    try {
+    await runScheduledJob('blog_generation', async () => {
+      logger.info('[blog-scheduler] Starting scheduled blog generation run');
       const result = await runDailyBlogGeneration(settings);
-      logger.info(`[blog-scheduler] Run complete`, { result });
-    } catch (err: any) {
-      logger.error('[blog-scheduler] Unhandled error during generation run', { error: err.message });
-    }
+      logger.info('[blog-scheduler] Run complete', { result });
+      return { generated: result.generated, failed: result.failed, skipped: result.skipped };
+    });
   });
 
   return activeTask;

@@ -107,6 +107,7 @@ const navSections: { label?: string; items: NavItem[] }[] = [
   {
     label: 'Operations',
     items: [
+      { label: 'Agents', href: '/admin/agents', icon: Bot },
       { label: 'Support Tickets', href: '/admin/support-tickets', icon: HelpCircle },
       { label: 'Audit & Compliance', href: '/admin/audit-logs', icon: Shield },
       {

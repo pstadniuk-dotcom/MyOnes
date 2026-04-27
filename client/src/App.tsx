@@ -59,6 +59,7 @@ const OrdersManagementPage = lazy(() => import("@/pages/admin/OrdersManagementPa
 const AuditLogsPage = lazy(() => import("@/pages/admin/AuditLogsPage"));
 const AdminBlogPage = lazy(() => import("@/pages/admin/AdminBlogPage"));
 const AdminSeoPage = lazy(() => import("@/pages/admin/AdminSeoPage"));
+const AdminAgentsPage = lazy(() => import("@/pages/admin/AdminAgentsPage"));
 const RetailComparisonPricingPage = lazy(() => import("@/pages/admin/RetailComparisonPricingPage"));
 const MembershipAdminPage = lazy(() => import("@/pages/admin/MembershipAdminPage"));
 const ContentManagementPage = lazy(() => import("@/pages/admin/ContentManagementPage"));
@@ -294,6 +295,13 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <Suspense fallback={<PageLoader />}><AdminSeoPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/agents">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><AdminAgentsPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

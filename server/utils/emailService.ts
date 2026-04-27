@@ -193,6 +193,43 @@ export function getNotificationEmailContent(
 // ── Internal admin notifications ──────────────────────────────────────
 
 /**
+ * Generic admin alert email — used for scheduler failures and other operational
+ * incidents. Non-fatal: never throws back to the caller. Body may be plain text
+ * or HTML; whitespace is preserved.
+ */
+export async function sendAdminAlert(subject: string, body: string): Promise<void> {
+  const recipients = getAdminOrderNotificationRecipients();
+  if (recipients.length === 0) return;
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL) {
+    logger.warn('Admin alert skipped: SendGrid not configured', { subject });
+    return;
+  }
+
+  // Body is server-generated; render whitespace as <br/> for readability while
+  // escaping any HTML-unsafe characters first.
+  const safeBody = escapeHtml(body).replace(/\n/g, '<br/>');
+  const html = getEmailTemplate({
+    to: recipients[0],
+    subject,
+    title: subject,
+    content: `<p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">${safeBody}</p>`,
+    type: 'system',
+  });
+
+  try {
+    await sgMail.send({
+      to: recipients,
+      from: { email: SENDGRID_FROM_EMAIL, name: SENDGRID_FROM_NAME },
+      subject: `[Ones Admin] ${subject}`,
+      html,
+    });
+    logger.info('Admin alert sent', { subject, recipientCount: recipients.length });
+  } catch (err: any) {
+    logger.error('Failed to send admin alert', { subject, error: err?.message });
+  }
+}
+
+/**
  * Return the list of admin email addresses that should receive internal
  * operational notifications (new orders, etc.). Configurable via the
  * ADMIN_ORDER_NOTIFICATION_EMAILS env var (comma-separated).

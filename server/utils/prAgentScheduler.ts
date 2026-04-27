@@ -14,6 +14,7 @@
  */
 import cron from 'node-cron';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
 import { getPrAgentConfig } from '../modules/agent/agent-config';
 import { runPrScan } from '../modules/agent/engines/pr-scan';
 import { runInvestorScan } from '../modules/agent/engines/investor-scan';
@@ -40,18 +41,15 @@ export function startPrAgentScheduler() {
 
   // ── Scan Job (Daily 6am UTC) ────────────────────────────────────────────
   scanTask = cron.schedule('0 6 * * *', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled) {
-        logger.info('[pr-scheduler] Scan skipped — PR Agent is disabled');
-        return;
-      }
+    const config = await getPrAgentConfig();
+    if (!config.enabled) {
+      logger.info('[pr-scheduler] Scan skipped — PR Agent is disabled');
+      return;
+    }
 
-      // Check budget before running
+    await runScheduledJob('pr_agent', async () => {
       const budget = await checkBudgetAlert();
-      if (budget.alert) {
-        logger.warn(`[pr-scheduler] Budget alert: ${budget.message}`);
-      }
+      if (budget.alert) logger.warn(`[pr-scheduler] Budget alert: ${budget.message}`);
 
       logger.info('[pr-scheduler] Starting scheduled prospect scan');
       const result = await runPrScan({
@@ -59,141 +57,132 @@ export function startPrAgentScheduler() {
         queriesPerCategory: 5,
         maxProspects: 50,
       });
+      logger.info('[pr-scheduler] Scan complete', { result });
 
-      logger.info('[pr-scheduler] Scan complete', {
-        prospectsFound: result.prospectsNew,
+      return {
+        subtask: 'scan',
+        prospectsNew: result.prospectsNew,
         podcasts: result.categories.podcast,
         press: result.categories.press,
         errors: result.errors.length,
-      });
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Scan failed', { error: err.message });
-    }
+      };
+    });
   });
 
   // ── Investor Scan Job (Daily 6:30am UTC) ─────────────────────────────────
   investorScanTask = cron.schedule('30 6 * * *', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled) {
-        logger.info('[pr-scheduler] Investor scan skipped — PR Agent is disabled');
-        return;
-      }
+    const config = await getPrAgentConfig();
+    if (!config.enabled) {
+      logger.info('[pr-scheduler] Investor scan skipped — PR Agent is disabled');
+      return;
+    }
 
+    await runScheduledJob('pr_agent', async () => {
       const budget = await checkBudgetAlert();
-      if (budget.alert) {
-        logger.warn(`[pr-scheduler] Budget alert: ${budget.message}`);
-      }
+      if (budget.alert) logger.warn(`[pr-scheduler] Budget alert: ${budget.message}`);
 
       logger.info('[pr-scheduler] Starting scheduled investor scan');
-      const result = await runInvestorScan({
-        queriesCount: 5,
-        maxProspects: 50,
-      });
+      const result = await runInvestorScan({ queriesCount: 5, maxProspects: 50 });
 
-      logger.info('[pr-scheduler] Investor scan complete', {
+      return {
+        subtask: 'investor_scan',
         prospectsFound: result.prospectsFound,
         prospectsNew: result.prospectsNew,
         duplicates: result.prospectsDuplicate,
         errors: result.errors.length,
-      });
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Investor scan failed', { error: err.message });
-    }
+      };
+    });
   });
 
   // ── Pitch Job (Daily 7am UTC) ────────────────────────────────────────────
   pitchTask = cron.schedule('0 7 * * *', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled) {
-        logger.info('[pr-scheduler] Pitch batch skipped — PR Agent is disabled');
-        return;
-      }
+    const config = await getPrAgentConfig();
+    if (!config.enabled) {
+      logger.info('[pr-scheduler] Pitch batch skipped — PR Agent is disabled');
+      return;
+    }
 
+    await runScheduledJob('pr_agent', async () => {
       logger.info('[pr-scheduler] Starting scheduled pitch batch');
-
       const podcastResult = await batchDraftPitches({ category: 'podcast' });
       const pressResult = await batchDraftPitches({ category: 'press' });
       const investorResult = await batchDraftPitches({ category: 'investor' });
 
-      logger.info('[pr-scheduler] Pitch batch complete', {
+      return {
+        subtask: 'pitch_batch',
         podcastPitches: podcastResult.pitched.length,
         pressPitches: pressResult.pitched.length,
         investorPitches: investorResult.pitched.length,
         errors: [...podcastResult.errors, ...pressResult.errors, ...investorResult.errors].length,
-      });
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Pitch batch failed', { error: err.message });
-    }
+      };
+    });
   });
 
   // ── Follow-Up Job (Daily 9am UTC) ────────────────────────────────────────
   followUpTask = cron.schedule('0 9 * * *', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled) return;
+    const config = await getPrAgentConfig();
+    if (!config.enabled) return;
 
+    await runScheduledJob('pr_agent', async () => {
       logger.info('[pr-scheduler] Starting follow-up processing');
       const result = await processFollowUps();
-      logger.info('[pr-scheduler] Follow-ups complete', {
+      return {
+        subtask: 'follow_up',
         drafted: result.draftsCreated,
         maxReached: result.skippedMaxFollowUps,
         errors: result.errors.length,
-      });
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Follow-up processing failed', { error: err.message });
-    }
+      };
+    });
   });
 
   // ── Response Detection (Every 4 hours) ────────────────────────────────────
+  // alertOnFailure=false: runs frequently, transient Gmail API hiccups shouldn't email.
   responseTask = cron.schedule('0 */4 * * *', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled || !config.gmailEnabled) return;
+    const config = await getPrAgentConfig();
+    if (!config.enabled || !config.gmailEnabled) return;
 
-      logger.info('[pr-scheduler] Checking for responses');
+    await runScheduledJob('pr_agent', async () => {
       const result = await detectResponses();
       if (result.responsesFound > 0) {
         logger.info('[pr-scheduler] Responses detected', {
           checked: result.checked,
           found: result.responsesFound,
-          responses: result.responses.map(r => `${r.prospectName}: ${r.classification}`),
         });
       }
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Response detection failed', { error: err.message });
-    }
+      return {
+        subtask: 'response_detection',
+        checked: result.checked,
+        responsesFound: result.responsesFound,
+      };
+    }, 'cron', { alertOnFailure: false });
   });
 
   // ── Competitor Scan (Sunday 8am UTC) ──────────────────────────────────────
   competitorTask = cron.schedule('0 8 * * 0', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled) return;
+    const config = await getPrAgentConfig();
+    if (!config.enabled) return;
 
+    await runScheduledJob('pr_agent', async () => {
       logger.info('[pr-scheduler] Starting weekly competitor scan');
       const result = await runCompetitorScan();
-      logger.info('[pr-scheduler] Competitor scan complete', {
+      return {
+        subtask: 'competitor_scan',
         appearances: result.appearances.length,
         newProspects: result.prospectsCreated,
-      });
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Competitor scan failed', { error: err.message });
-    }
+      };
+    });
   });
 
   // ── Weekly Summary Email (Friday 5pm UTC) ─────────────────────────────────
   summaryTask = cron.schedule('0 17 * * 5', async () => {
-    try {
-      const config = await getPrAgentConfig();
-      if (!config.enabled) return;
+    const config = await getPrAgentConfig();
+    if (!config.enabled) return;
 
+    await runScheduledJob('pr_agent', async () => {
       logger.info('[pr-scheduler] Sending weekly PR summary');
       await sendWeeklySummaryEmail(config.gmailFrom || 'pete@ones.health');
-    } catch (err: any) {
-      logger.error('[pr-scheduler] Weekly summary failed', { error: err.message });
-    }
+      return { subtask: 'weekly_summary', sentTo: config.gmailFrom || 'pete@ones.health' };
+    });
   });
 
   logger.info('[pr-scheduler] Cron jobs registered: scan(daily 6am), investor-scan(daily 6:30am), pitch(daily 7am), follow-up(daily 9am), responses(every 4h), competitors(Sun 8am), summary(Fri 5pm)');
