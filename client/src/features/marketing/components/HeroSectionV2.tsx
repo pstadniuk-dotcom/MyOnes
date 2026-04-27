@@ -145,7 +145,7 @@ export default function HeroSectionV2() {
           </h1>
 
           {/* Subhead */}
-          <p className="text-lg md:text-xl text-[rgba(0,0,0,0.75)] font-light leading-relaxed max-w-lg">
+          <p className="text-lg md:text-xl text-[rgba(0,0,0,0.75)] font-light leading-relaxed max-w-lg mx-auto lg:mx-0">
             ONES uses your bloodwork, wearable data, and habits to build a
             personalized daily supplement, designed uniquely for your body and
             updated as your biology changes.
