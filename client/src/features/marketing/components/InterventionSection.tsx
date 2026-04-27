@@ -487,6 +487,14 @@ export function OnesDifferenceSection() {
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [tryPlay]);
+  const attemptPlay = useCallback(() => {
+  const v = mobileVideoRef.current;
+  if (!v) return;
+  v.muted = true; 
+  v.play()
+    .then(() => setMobileVideoBlocked(false))
+    .catch(() => setMobileVideoBlocked(true)); 
+}, []);
 
   return (
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
@@ -526,42 +534,49 @@ export function OnesDifferenceSection() {
           {/* ── Mobile Video (Always visible, no stagger animation) ── */}
           <div className="md:hidden flex justify-center mb-8">
             <div className="relative w-full max-w-sm">
-              {/* Radial glow behind video */}
               <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
-              <video
-                ref={mobileVideoRef}
-                src="/capsule-formation.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="auto"
-                onCanPlay={() => {
-                  if (mobileVideoRef.current?.paused) tryPlay();
-                }}
-                style={{ aspectRatio: '1 / 1' }}
-                className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-              />
+           <video
+      ref={mobileVideoRef}
+      src="/capsule-formation.mp4"
+      autoPlay
+      loop
+      muted
+      playsInline
+      webkit-playsinline="true"    // iOS Safari legacy
+      x5-playsinline="true"        // Android WebView
+      preload="metadata"           // ← was "auto", mobile blocks that
+      onLoadedMetadata={attemptPlay}  // earliest safe moment to call play()
+      onCanPlay={attemptPlay}         // fallback if metadata fires without data
+      style={{ aspectRatio: '1 / 1' }}
+      className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
+    />
               {mobileVideoBlocked && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const v = mobileVideoRef.current;
-                    if (!v) return;
-                    v.muted = true;
-                    // On Android, v.load() is often necessary to 'wake up' the stream after a system block
-                    v.load();
-                    v.play()
-                      .then(() => setMobileVideoBlocked(false))
-                      .catch((err) => console.error("Manual play failed", err));
-                  }}
-                  aria-label="Play capsule formation video"
-                  className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
-                >
-                  <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
-                    <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]"><path d="M8 5v14l11-7z" /></svg>
-                  </span>
-                </button>
+                 <button
+        type="button"
+        onClick={() => {
+          const v = mobileVideoRef.current;
+          if (!v) return;
+          v.muted = true;
+          v.load();  // Android needs this
+          // Wait for load to settle before playing
+          v.oncanplay = () => {
+            v.play()
+              .then(() => {
+                setMobileVideoBlocked(false);
+                v.oncanplay = null; // clean up
+              })
+              .catch((err) => console.error("Manual play failed", err));
+          };
+        }}
+        aria-label="Play capsule formation video"
+        className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
+      >
+        <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+          <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+      </button>
               )}
             </div>
           </div>
