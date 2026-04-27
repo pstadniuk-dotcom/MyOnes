@@ -288,6 +288,75 @@ function normalizeMessageFormula(formula?: unknown): MessageFormulaPayload | nul
 }
 
 export class ChatService {
+    /**
+     * Non-streaming completion for short, focused JSON-returning calls
+     * (e.g. the formula expander). Returns the full text response as a string.
+     *
+     * Provider is selected by the `provider` argument so callers can use
+     * whatever the session is currently configured for. Includes a hard
+     * timeout because these calls block formula save and we cannot let
+     * them hang indefinitely.
+     */
+    async complete(args: {
+        provider: 'openai' | 'anthropic';
+        model: string;
+        systemPrompt: string;
+        userPrompt: string;
+        temperature?: number;
+        maxTokens?: number;
+        timeoutMs?: number;
+    }): Promise<string> {
+        const {
+            provider,
+            model,
+            systemPrompt,
+            userPrompt,
+            temperature = 0.4,
+            maxTokens = 1024,
+            timeoutMs = 12_000,
+        } = args;
+
+        const callPromise: Promise<string> = (async () => {
+            if (provider === 'anthropic') {
+                const resp = await anthropic.messages.create({
+                    model,
+                    max_tokens: maxTokens,
+                    system: systemPrompt,
+                    temperature,
+                    messages: [{ role: 'user', content: userPrompt }],
+                });
+                const text = resp.content
+                    .filter((b: any) => b.type === 'text')
+                    .map((b: any) => b.text)
+                    .join('');
+                return text;
+            } else {
+                const resp = await openai.chat.completions.create({
+                    model,
+                    temperature,
+                    max_completion_tokens: maxTokens,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                });
+                return resp.choices?.[0]?.message?.content || '';
+            }
+        })();
+
+        // Hard timeout — we don't want a slow expansion call to block formula save.
+        let timer: NodeJS.Timeout | undefined;
+        const timeoutPromise = new Promise<string>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`AI complete() timed out after ${timeoutMs}ms`)), timeoutMs);
+        });
+
+        try {
+            return await Promise.race([callPromise, timeoutPromise]);
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
     async *streamAnthropic(systemPrompt: string, messages: any[], model: string, temperature: number, maxTokens: number) {
         const stream = await anthropic.messages.stream({
             model: model,

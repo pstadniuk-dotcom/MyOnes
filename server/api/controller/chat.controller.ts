@@ -14,6 +14,7 @@ import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builde
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
 import { canonicalKey } from '../../modules/labs/biomarker-aliases';
 import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula } from '../../modules/formulas/formula-service';
+import { expandFormulaWithAI, buildClinicalContextSummary } from '../../modules/chat/formula-expander';
 import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
@@ -709,6 +710,85 @@ export class ChatController {
                     const budgetFit = autoFitFormulaToBudget(validatedFormula);
                     if (budgetFit.adjusted && budgetFit.message) {
                         sendSSE({ type: 'info', message: budgetFit.message });
+                    }
+
+                    // ── AI-DRIVEN EXPANSION (preferred) ───────────────────
+                    // If the formula is under the manufacturing minimum, try a
+                    // focused second AI call so the model fills its OWN formula
+                    // with clinically relevant ingredients (not the hardcoded
+                    // filler list). David's complaint: items like Hawthorn Berry
+                    // and Ginger Root were being added as space-fillers with no
+                    // relevance to him. The system autoExpand below remains as
+                    // the final safety net for the manufacturing constraint.
+                    const minRequiredMg = Math.floor(baseBudget * FORMULA_LIMITS.MIN_BUDGET_UTILIZATION_PERCENT);
+                    if (validatedFormula.totalMg < minRequiredMg) {
+                        try {
+                            const labFlagSnippet = typeof labDataContext === 'string' && labDataContext.length > 0
+                                ? [labDataContext.substring(0, 600).replace(/\s+/g, ' ').trim()]
+                                : undefined;
+                            const clinicalSummary = buildClinicalContextSummary({
+                                goals: (healthProfile as any)?.healthGoals || (healthProfile as any)?.goals,
+                                conditions: (healthProfile as any)?.conditions,
+                                medications: (healthProfile as any)?.medications,
+                                keyLabFlags: labFlagSnippet,
+                            });
+
+                            const aiExpansion = await expandFormulaWithAI(
+                                {
+                                    formula: validatedFormula,
+                                    targetMg: baseBudget,
+                                    minAcceptableMg: minRequiredMg,
+                                    maxAcceptableMg: maxWithTolerance,
+                                    rejectedIngredients: mergedRejected,
+                                    clinicalContextSummary: clinicalSummary,
+                                },
+                                async ({ systemPrompt, userPrompt, timeoutMs }) =>
+                                    chatService.complete({
+                                        provider: aiProvider,
+                                        model,
+                                        systemPrompt,
+                                        userPrompt,
+                                        temperature: 0.4,
+                                        maxTokens: 800,
+                                        timeoutMs,
+                                    }),
+                            );
+
+                            if (aiExpansion.success && aiExpansion.additions.length > 0) {
+                                // Merge into formula
+                                if (!Array.isArray(validatedFormula.additions)) validatedFormula.additions = [];
+                                validatedFormula.additions.push(...aiExpansion.additions);
+                                // Recalculate total
+                                const recalc = validateAndCalculateFormula(validatedFormula);
+                                validatedFormula.totalMg = recalc.calculatedTotalMg;
+
+                                const summary = aiExpansion.additions
+                                    .map(a => `${a.ingredient} ${a.amount}${a.unit}`)
+                                    .join(', ');
+                                sendSSE({
+                                    type: 'info',
+                                    message: `Added ${aiExpansion.additions.length} clinically-targeted ingredient${aiExpansion.additions.length === 1 ? '' : 's'} to complete your protocol: ${summary}.`,
+                                });
+                                logger.info('AI formula expansion succeeded', {
+                                    userId,
+                                    addedCount: aiExpansion.additions.length,
+                                    addedNames: aiExpansion.additions.map(a => a.ingredient),
+                                    newTotalMg: validatedFormula.totalMg,
+                                    targetMg: baseBudget,
+                                });
+                            } else if (!aiExpansion.success) {
+                                logger.info('AI formula expansion did not produce usable additions — falling back to system autoExpand', {
+                                    userId,
+                                    reason: aiExpansion.reason,
+                                });
+                            }
+                        } catch (expandErr: any) {
+                            // Never let the expander crash formula save — fall through to system autoExpand.
+                            logger.warn('AI formula expansion threw — falling back to system autoExpand', {
+                                userId,
+                                error: expandErr?.message,
+                            });
+                        }
                     }
 
                     const expansion = autoExpandFormula(validatedFormula, mergedRejected);
