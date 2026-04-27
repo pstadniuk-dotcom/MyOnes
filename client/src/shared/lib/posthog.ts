@@ -29,8 +29,23 @@ export function initPostHog(): void {
     capture_pageview: true,
     capture_pageleave: true,
     autocapture: true,
-    // Session replay — disabled by default; turn on in PostHog UI per environment
+    // Session replay — must ALSO be enabled in PostHog UI:
+    // Project Settings → Session Replay → toggle on.
     disable_session_recording: false,
+    session_recording: {
+      // Mask anything sensitive. Inputs are masked by default in posthog-js v1.x
+      // when maskAllInputs is true; we extend with explicit selectors for our
+      // checkout (Collect.js iframes, card fields) and any element marked
+      // data-ph-mask="true" or .ph-mask.
+      maskAllInputs: true,
+      maskTextSelector:
+        '.ph-mask, [data-ph-mask="true"], [data-sensitive], input[type="password"], input[name*="card"], input[name*="cvv"], input[name*="ssn"], iframe[src*="collectjs"], iframe[src*="basistheory"]',
+      // Don't record on these URLs (admin panel + debug routes have noisy data)
+      maskInputOptions: {
+        password: true,
+        email: false, // we want to see what email a user typed (with consent)
+      },
+    },
     loaded: (ph) => {
       if (import.meta.env.DEV) ph.debug(false);
     },
