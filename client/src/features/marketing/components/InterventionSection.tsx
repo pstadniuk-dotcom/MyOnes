@@ -434,11 +434,11 @@ export function OnesDifferenceSection() {
   const [, navigate] = useLocation();
   
 
-    const videoRef = useRef<HTMLVideoElement | null>(null);
+    // const videoRef = useRef<HTMLVideoElement | null>(null);
 
-    useEffect(() => {
-      videoRef.current?.play().catch(console.log);
-    }, []);
+    // useEffect(() => {
+    //   videoRef.current?.play().catch(console.log);
+    // }, []);
 
 
   return (
@@ -480,14 +480,25 @@ export function OnesDifferenceSection() {
           <div className="md:hidden flex justify-center mb-8">
             <div className="relative w-full max-w-sm">
               <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
-              <video
+              {/* <video
                 ref={videoRef}
                 src="/capsule-formation.mp4"
                 autoPlay
                 muted
                 style={{ aspectRatio: '1 / 1' }}
                 className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-              />
+              /> */}
+
+<iframe
+  width="100%"
+  height="341"
+  src="https://www.youtube.com/embed/T2TZbnon-kE?autoplay=1&mute=1&loop=1&playlist=T2TZbnon-kE&controls=0&rel=0&modestbranding=1&playsinline=1"
+  title="video"
+  frameBorder="0"
+  allow="autoplay; encrypted-media; picture-in-picture; web-share"
+  referrerPolicy="strict-origin-when-cross-origin"
+  allowFullScreen
+></iframe>
             </div>
           </div>
 
