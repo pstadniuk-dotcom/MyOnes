@@ -521,11 +521,7 @@ export function OnesDifferenceSection() {
           </motion.div>
 
           {/* Video + Ingredient Cards */}
-          <motion.div
-            initial="hidden"
-            animate={solutionInView ? "visible" : "hidden"}
-            variants={stagger}
-          >
+          <div>
             {/* ── Mobile Layout ── */}
             <div className="md:hidden">
               <div className="flex justify-center mb-8">
@@ -553,7 +549,8 @@ export function OnesDifferenceSection() {
                         const v = mobileVideoRef.current;
                         if (!v) return;
                         v.muted = true;
-                        // Directly call play() after user gesture; load() can be counter-productive here
+                        // On Android, v.load() is often necessary to 'wake up' the stream after a system block
+                        v.load();
                         v.play()
                           .then(() => setMobileVideoBlocked(false))
                           .catch((err) => console.error("Manual play failed", err));
@@ -677,7 +674,7 @@ export function OnesDifferenceSection() {
                 ))}
               </div>
             </div>
-          </motion.div>
+          </div>
 
           {/* CTA */}
           <motion.div
