@@ -432,48 +432,7 @@ export function OnesDifferenceSection() {
   const solutionRef = useRef<HTMLElement>(null);
   const solutionInView = useInView(solutionRef, { once: true, margin: "-50px" });
   const [, navigate] = useLocation();
-  const mobileVideoRef = useRef<HTMLVideoElement>(null);
-  const [mobileVideoBlocked, setMobileVideoBlocked] = useState(false);
 
-  // Try to autoplay the mobile capsule video; if the browser blocks it (iOS Low Power Mode,
-  // Android data-saver, etc.) show a tap-to-play overlay so users still see something.
-  // React doesn't always set the HTML `muted` attribute correctly on initial render, which
-  // can cause iOS Safari to treat the autoplay as audible and block it — we fix that imperatively.
-  // We also gate every play() on `paused` so we never overlap the browser's own autoplay
-  // attempt (overlapping play() calls reject the first promise with AbortError, which used
-  // to spuriously flip blocked=true).
- 
-useEffect(() => {
-  const v = mobileVideoRef.current;
-  if (!v) return;
-
-  v.muted = true;          // imperative — beats React's render timing
-  v.defaultMuted = true;
-  v.setAttribute('playsinline', '');   // belt-and-suspenders for iOS Safari
-
-  const tryPlay = () => {
-    if (!v.paused) return;
-    const playPromise = v.play();
-    if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        if (err.name === 'AbortError') return;
-        console.warn('Video play blocked:', err);
-        setMobileVideoBlocked(true);
-      });
-    }
-  };
-
-  ['loadeddata', 'canplay', 'canplaythrough'].forEach(e =>
-    v.addEventListener(e, tryPlay)
-  );
-  tryPlay(); // attempt immediately if already ready
-
-  return () => {
-    ['loadeddata', 'canplay', 'canplaythrough'].forEach(e =>
-      v.removeEventListener(e, tryPlay)
-    );
-  };
-}, []);
 
   return (
       <section ref={solutionRef} id="the-difference" className="py-24 md:py-32 bg-[#ede8e2] scroll-mt-24">
@@ -514,45 +473,17 @@ useEffect(() => {
           <div className="md:hidden flex justify-center mb-8">
             <div className="relative w-full max-w-sm">
               <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
-           <video
-              ref={mobileVideoRef}
-              src="/capsule-formation.mp4"
-              loop
-              muted
-              playsInline
-              preload="auto"
-              disablePictureInPicture
-              style={{ aspectRatio: '1 / 1' }}
-              className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-            />
-              {mobileVideoBlocked && (
-                 <button
-                type="button"
-                onClick={() => {
-                  const v = mobileVideoRef.current;
-                  if (!v) return;
-                  v.muted = true;
-                  v.load();  // Android needs this
-                  // Wait for load to settle before playing
-                  v.oncanplay = () => {
-                    v.play()
-                      .then(() => {
-                        setMobileVideoBlocked(false);
-                        v.oncanplay = null; // clean up
-                      })
-              .catch((err) => console.error("Manual play failed", err));
-          };
-        }}
-        aria-label="Play capsule formation video"
-        className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
-      >
-        <span className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
-          <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1 fill-[#054700]">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </span>
-      </button>
-              )}
+              <video
+                src="/capsule-formation.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                disablePictureInPicture
+                controlsList="noplaybackrate nodownload"
+                style={{ aspectRatio: '1 / 1' }}
+                className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover pointer-events-none"
+              />
             </div>
           </div>
 
