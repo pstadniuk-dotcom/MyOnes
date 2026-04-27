@@ -476,7 +476,8 @@ export function OnesDifferenceSection() {
 
     const onVis = () => { 
       if (!document.hidden && v.paused) {
-        tryPlay();
+        // A small delay helps some mobile browsers recover from backgrounding
+        setTimeout(tryPlay, 100);
       }
     };
     document.addEventListener('visibilitychange', onVis);
@@ -536,16 +537,16 @@ export function OnesDifferenceSection() {
                   <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
                     ref={mobileVideoRef}
-                    src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
                     preload="auto"
-                    disableRemotePlayback
                     style={{ aspectRatio: '1 / 1' }}
                     className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-                  />
+                  >
+                    <source src="/capsule-formation.mp4" type="video/mp4" />
+                  </video>
                   {mobileVideoBlocked && (
                     <button
                       type="button"
@@ -553,7 +554,11 @@ export function OnesDifferenceSection() {
                         const v = mobileVideoRef.current;
                         if (!v) return;
                         v.muted = true;
-                        v.play().then(() => setMobileVideoBlocked(false)).catch(() => {});
+                        // Forcing a load() and then play() is the most reliable way to start a blocked video
+                        v.load();
+                        v.play()
+                          .then(() => setMobileVideoBlocked(false))
+                          .catch((err) => console.error("Manual play failed", err));
                       }}
                       aria-label="Play capsule formation video"
                       className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#054700]/40"
