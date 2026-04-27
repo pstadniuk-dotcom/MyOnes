@@ -623,6 +623,12 @@ export const fileUploads = pgTable("file_uploads", {
      * show clearer messaging when 0 markers are extracted.
      */
     documentKind?: 'results' | 'requisition' | 'unknown';
+    /**
+     * Raw OCR text from the original document. Persisted so we can re-run
+     * structureLabData() without re-OCRing the PDF (saves ~30s + tokens),
+     * and so support/admin tools can debug parsing issues.
+     */
+    rawText?: string;
   }>(),
   // Soft delete for compliance (never actually delete PHI)
   deletedAt: timestamp("deleted_at"),

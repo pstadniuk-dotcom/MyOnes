@@ -265,6 +265,7 @@ export class FilesService {
                                 documentKind: outcome.documentKind,
                                 progressDetail: outcome.progressDetail,
                                 extractedData: markers,
+                                rawText: labDataExtraction.rawText,
                             }
                         });
                         // Mirror into lab_analyses so AI Brain / formula review can read structured markers.
@@ -472,6 +473,7 @@ export class FilesService {
                                 documentKind: outcome.documentKind,
                                 progressDetail: outcome.progressDetail,
                                 extractedData: markers,
+                                rawText: labDataExtraction.rawText,
                             }
                         });
                         await filesRepository.upsertLabAnalysisForFile({

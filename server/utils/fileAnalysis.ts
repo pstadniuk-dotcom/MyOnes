@@ -288,33 +288,35 @@ export async function scanSupplementLabel(
   const base64Image = normalized.buffer.toString('base64');
   const dataUrl = `data:${normalized.mimeType};base64,${base64Image}`;
 
-  const systemPrompt = `You are an expert at reading "Supplement Facts" panels on dietary supplement bottles.
+  const systemPrompt = `You are an expert at reading dietary supplement labels — bottles, jars, pouches, and powdered drink mixes.
 
-Extract every active ingredient from the supplement facts panel in the photo. Return STRICT JSON only — no prose, no markdown.
+Extract every active ingredient you can see on the label. Return STRICT JSON only — no prose, no markdown.
 
 JSON shape:
 {
-  "productName": string | null,           // top-of-label product name (e.g. "Daily Multivitamin")
+  "productName": string | null,           // top-of-label product name (e.g. "Daily Multivitamin", "IM8 Daily Ultimate Health")
   "brand": string | null,                 // manufacturer/brand if visible
   "servingSize": string | null,           // e.g. "2 capsules", "1 scoop (10g)"
   "servingsPerContainer": string | null,  // e.g. "30", "60"
   "ingredients": [
     {
       "name": string,            // ingredient name as printed (e.g. "Vitamin D3 (as cholecalciferol)")
-      "dose": string | null,     // numeric dose per serving, no unit (e.g. "1000")
+      "dose": string | null,     // numeric dose per serving, no unit (e.g. "1000"). Use null when no amount is printed.
       "unit": string | null,     // unit only (e.g. "mg", "mcg", "iu", "billion CFU")
       "percentDailyValue": string | null  // %DV if printed (e.g. "125%")
     }
   ],
-  "notes": string | null  // any other useful info (form, allergens, warnings)
+  "notes": string | null  // any useful info (form, allergens, warnings, why extraction was partial)
 }
 
 Rules:
-- ONLY extract from the Supplement Facts / Nutrition Facts panel — ignore marketing text on the front of the label.
-- If you cannot read the panel clearly, return {"ingredients": []} and put the reason in "notes".
-- Skip "Other Ingredients" (excipients like cellulose, magnesium stearate) — only return ACTIVE ingredients with doses.
-- For proprietary blends, list each named ingredient inside the blend if amounts are shown; otherwise list the blend name with its total.
-- Preserve the ingredient name as printed (do not auto-correct).
+- PREFER the Supplement Facts / Nutrition Facts panel when visible. If you can ONLY see the front of the label, still extract the productName/brand and any ingredient names that are listed (many products like greens powders, IM8, multivitamins print key ingredients or proprietary blend names on the front).
+- Also accept other ingredient list formats: "Active Ingredients", "Key Ingredients", "Each capsule contains", "Daily Ultimate Health blend", proprietary blend tables, or simple bulleted ingredient lists.
+- For proprietary blends (very common in greens/superfood products): list the blend name as a single entry with its total amount (e.g. {"name":"Daily Ultimate Health Blend","dose":"11.4","unit":"g"}). If individual ingredients inside the blend are also named with amounts, add them as separate entries. If they are named WITHOUT individual amounts (very common), still add each named ingredient with dose=null so the user can pick them.
+- Skip "Other Ingredients" / excipients (cellulose, magnesium stearate, silicon dioxide, gelatin, rice flour, natural flavors, stevia, citric acid).
+- Preserve the ingredient name as printed (do not auto-correct or rename).
+- ONLY return {"ingredients": []} if the photo contains no readable supplement-related text at all (e.g. wrong photo, totally blurry). If you can read SOMETHING, return what you can read and explain any limitations in "notes".
+- When you return an empty list, "notes" MUST tell the user what to do (e.g. "Could not read the label clearly — try a sharper photo of the back of the bottle showing the Supplement Facts panel.").
 - Return valid JSON. No code fences. No commentary.`;
 
   const response = await withTimeout(
@@ -459,6 +461,14 @@ Extract the following top-level fields:
   - unit: The unit of measurement (if present)
   - referenceRange: The normal reference range exactly as shown (e.g., "< 100 mg/dL", "30-100 ng/mL")
   - status: "high", "low", "critical", or "normal" based on the reference range. Use "critical" only for values far outside the range that need urgent attention.
+    SPECIAL HANDLING for tiered ranges (used by SiPhox, Function Health, InsideTracker, etc. — formatted like "optimal: 80-100; good: >60; fair: >40"):
+      • Treat the WIDEST tier ("fair", or "good" if no fair tier exists) as the abnormal threshold.
+      • If the value falls inside ANY tier (fair OR better) → status = "normal".
+      • If the value falls outside the widest tier on the LOW end → status = "low".
+      • If the value falls outside the widest tier on the HIGH end → status = "high".
+      • Do NOT flag a marker "low" or "high" just because it sits outside the "optimal" tier — that creates false alarms when the value is still clinically acceptable.
+      • EXCEPTION: For markers where higher = better with no clinical concern at the top (eGFR, daily steps, sleep efficiency, sleep duration when above range, basal metabolic rate, activity minutes), set status = "normal" when the value is at or above the upper bound — never "high".
+  - SKIP this row entirely (do NOT include it in extractedData) if the value is "DNR", "Did Not Run", "Not Performed", "Not Run", "Pending", "—", "-", "N/A", "QNS", or otherwise blank/unreported. Only include markers that actually have a numeric or qualitative result.
   - category: The panel category this marker belongs to. Use one of: "Lipid Panel", "Complete Blood Count", "Metabolic Panel", "Liver Function", "Thyroid", "Vitamins & Minerals", "Hormones", "Inflammation", "Diabetes & Blood Sugar", "Kidney Function", "Cardiac", "Omega & Fatty Acids", "Urinalysis", "Autoimmune & Immune", "Prostate", "Toxicology & Metals", "Blood Type", "Other"
   - clinicalNote: For any marker that is NOT normal, provide a brief 1-sentence explanation of what this value means for the patient's health. Leave empty string for normal markers.
 - riskPatterns: Array of multi-marker patterns you identify. Each has:
@@ -626,6 +636,25 @@ Return ONLY valid JSON without any markdown formatting.`;
         } else {
           structured.testDateSource = structured.testDateSource || 'NOT FOUND';
           structured.testDateConfidence = 'none';
+        }
+      }
+
+      // ── Post-filter: drop markers with no real value ──
+      // Belt-and-suspenders for the prompt rule above. Labs (Quest, LabCorp,
+      // SiPhox) sometimes print rows like "AST: DNR" when a reflex test was
+      // skipped; we don't want those to appear in the dashboard as "normal".
+      if (Array.isArray(structured.extractedData)) {
+        const before = structured.extractedData.length;
+        const isMissingValue = (v: unknown): boolean => {
+          if (v == null) return true;
+          const s = String(v).trim().toLowerCase();
+          if (!s) return true;
+          return ['dnr', 'did not run', 'not performed', 'not run', 'pending', 'n/a', 'na', 'qns', '—', '-', '--', 'none reported', 'no result'].includes(s);
+        };
+        structured.extractedData = structured.extractedData.filter((m: any) => !isMissingValue(m?.value));
+        const dropped = before - structured.extractedData.length;
+        if (dropped > 0) {
+          logger.info(`Dropped ${dropped} marker row(s) with no value (DNR/blank/etc.)`);
         }
       }
 

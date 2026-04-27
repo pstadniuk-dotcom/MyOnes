@@ -109,9 +109,15 @@ export function SupplementLabelScanner({ onConfirm, existing }: SupplementLabelS
       setSelected(initialSelected);
 
       if (data.ingredients.length === 0) {
+        // Auto-select the product name so a user with a tricky label (e.g. powders
+        // like IM8 where the facts panel is hard to photograph) can still capture
+        // SOMETHING with one tap rather than abandoning the scan.
+        if (data.productName) setProductNameSelected(true);
         toast({
           title: 'No ingredients detected',
-          description: data.notes || 'Try a clearer photo of the Supplement Facts panel.',
+          description:
+            data.notes ||
+            'Try a sharper photo of the BACK of the bottle showing the Supplement Facts panel. You can still add the product name as a single entry.',
           variant: 'destructive',
         });
       }
@@ -311,6 +317,18 @@ export function SupplementLabelScanner({ onConfirm, existing }: SupplementLabelS
 
                 {result.notes && (
                   <div className="text-xs text-muted-foreground italic">{result.notes}</div>
+                )}
+
+                {result.ingredients.length === 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div className="font-medium mb-1">No ingredients detected</div>
+                    <p className="text-xs leading-relaxed">
+                      We couldn&apos;t read a clear ingredient panel from this photo. For best results, photograph the
+                      <strong> back of the bottle</strong> showing the &quot;Supplement Facts&quot; panel — flat, well-lit, and
+                      filling the frame. You can still add the product name above as a single entry, or close this
+                      dialog and type ingredients in manually.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
