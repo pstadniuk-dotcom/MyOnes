@@ -479,10 +479,11 @@ export function OnesDifferenceSection() {
                 loop
                 muted
                 playsInline
+                preload="auto"
                 disablePictureInPicture
                 controlsList="noplaybackrate nodownload"
                 style={{ aspectRatio: '1 / 1' }}
-                className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover pointer-events-none"
+                className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
               />
             </div>
           </div>
