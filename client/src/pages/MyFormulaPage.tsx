@@ -1522,12 +1522,12 @@ export default function MyFormulaPage() {
                               <div>
                                 <div className="flex items-baseline gap-1.5">
                                   <span className="text-3xl font-black text-[#054700] tabular-nums">
-                                    {onesMonthly > 0 ? `$${onesMonthly.toFixed(2)}` : '—'}
+                                    {onesMonthly > 0 ? `$${Math.round(onesMonthly)}` : '—'}
                                   </span>
                                   <span className="text-xs text-[#5a6623]">/ month</span>
                                 </div>
                                 <div className="text-[10px] text-[#5a6623]/70 mt-0.5">
-                                  ${effectiveOnesCost.toFixed(2)} per {supplyWeeks}-week order
+                                  ${Math.round(effectiveOnesCost)} per {supplyWeeks}-week order
                                   {isMemberPricing && <span className="text-[#D4A574] font-medium ml-1">· Member price</span>}
                                 </div>
                               </div>
