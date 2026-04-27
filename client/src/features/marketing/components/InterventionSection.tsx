@@ -251,12 +251,15 @@ export default function InterventionSection() {
               <motion.div variants={scaleIn} className="flex justify-center mb-8">
                 <div className="relative w-full max-w-sm">
                   <video
-                    src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
-                    playsInline                    preload="auto"                    className="relative w-full h-auto rounded-2xl shadow-xl"
-                  />
+                    playsInline
+                    preload="auto"
+                    className="relative w-full h-auto rounded-2xl shadow-xl"
+                  >
+                    <source src="/capsule-formation.mp4" type="video/mp4" />
+                  </video>
                 </div>
               </motion.div>
 
@@ -343,14 +346,15 @@ export default function InterventionSection() {
               <motion.div variants={scaleIn} className="relative flex items-center justify-center">
                 <div className="relative w-full">
                   <video
-                    src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
                     preload="auto"
                     className="relative w-full h-auto rounded-2xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.12)]"
-                  />
+                  >
+                    <source src="/capsule-formation.mp4" type="video/mp4" />
+                  </video>
                 </div>
               </motion.div>
 
@@ -519,7 +523,6 @@ export function OnesDifferenceSection() {
                   <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
                     ref={mobileVideoRef}
-                    src="/capsule-formation.mp4"
                     autoPlay
                     loop
                     muted
@@ -528,7 +531,9 @@ export function OnesDifferenceSection() {
                     disableRemotePlayback
                     style={{ aspectRatio: '1 / 1' }}
                     className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
-                  />
+                  >
+                    <source src="/capsule-formation.mp4" type="video/mp4" />
+                  </video>
                   {mobileVideoBlocked && (
                     <button
                       type="button"
@@ -619,7 +624,9 @@ export function OnesDifferenceSection() {
               {/* Center Video with glow */}
               <motion.div variants={scaleIn} className="relative flex items-center justify-center">
                 <div className="absolute inset-0 -inset-x-12 -inset-y-12 bg-[radial-gradient(circle,_rgba(138,154,44,0.1)_0%,_transparent_65%)]" />
-                <video src="/capsule-formation.mp4" autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-3xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.15),_0_0_0_1px_rgba(255,255,255,0.3)]" />
+                <video autoPlay loop muted playsInline preload="auto" className="relative w-full h-auto rounded-3xl shadow-[0_32px_80px_-16px_rgba(5,71,0,0.15),_0_0_0_1px_rgba(255,255,255,0.3)]">
+                  <source src="/capsule-formation.mp4" type="video/mp4" />
+                </video>
               </motion.div>
 
               {/* Right connectors */}
