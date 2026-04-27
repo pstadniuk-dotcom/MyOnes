@@ -433,21 +433,42 @@ export function OnesDifferenceSection() {
 
   // Try to autoplay the mobile capsule video; if the browser blocks it (iOS Low Power Mode,
   // Android data-saver, etc.) show a tap-to-play overlay so users still see something.
+  // React doesn't always set the HTML `muted` attribute correctly on initial render, which
+  // can cause iOS Safari to treat the autoplay as audible and block it — we fix that imperatively.
+  // We also gate every play() on `paused` so we never overlap the browser's own autoplay
+  // attempt (overlapping play() calls reject the first promise with AbortError, which used
+  // to spuriously flip blocked=true).
   useEffect(() => {
     const v = mobileVideoRef.current;
     if (!v) return;
     v.muted = true;
+    let cancelled = false;
     const tryPlay = () => {
+      if (cancelled || !v.paused) return;
       const p = v.play();
       if (p && typeof p.then === 'function') {
-        p.then(() => setMobileVideoBlocked(false)).catch(() => setMobileVideoBlocked(true));
+        p.then(() => { if (!cancelled) setMobileVideoBlocked(false); })
+         .catch((err) => {
+           if (cancelled) return;
+           // AbortError just means another play() (often the autoPlay attribute) won the race.
+           // Don't show the blocked overlay for that — only for genuine NotAllowedError etc.
+           if (err && err.name === 'AbortError') return;
+           setMobileVideoBlocked(true);
+         });
       }
     };
-    tryPlay();
-    // Retry once on visibility/focus in case the page loaded in a backgrounded tab
+    if (v.readyState >= 2) {
+      tryPlay();
+    } else {
+      v.addEventListener('loadeddata', tryPlay, { once: true });
+    }
     const onVis = () => { if (!document.hidden && v.paused) tryPlay(); };
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      v.removeEventListener('loadeddata', tryPlay);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, []);
 
   return (
@@ -505,15 +526,6 @@ export function OnesDifferenceSection() {
                     playsInline
                     preload="auto"
                     disableRemotePlayback
-                    onLoadedData={() => {
-                      const v = mobileVideoRef.current;
-                      if (!v) return;
-                      v.muted = true;
-                      const p = v.play();
-                      if (p && typeof p.then === 'function') {
-                        p.catch(() => setMobileVideoBlocked(true));
-                      }
-                    }}
                     style={{ aspectRatio: '1 / 1' }}
                     className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
                   />
