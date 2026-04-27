@@ -436,13 +436,18 @@ export function OnesDifferenceSection() {
   useEffect(() => {
     const v = mobileVideoRef.current;
     if (!v) return;
+    v.muted = true;
     const tryPlay = () => {
       const p = v.play();
       if (p && typeof p.then === 'function') {
-        p.catch(() => setMobileVideoBlocked(true));
+        p.then(() => setMobileVideoBlocked(false)).catch(() => setMobileVideoBlocked(true));
       }
     };
     tryPlay();
+    // Retry once on visibility/focus in case the page loaded in a backgrounded tab
+    const onVis = () => { if (!document.hidden && v.paused) tryPlay(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
   return (
@@ -488,7 +493,7 @@ export function OnesDifferenceSection() {
             {/* ── Mobile Layout ── */}
             <div className="md:hidden">
               <div className="flex justify-center mb-8">
-                <div className="relative w-full max-w-sm aspect-square">
+                <div className="relative w-full max-w-sm">
                   {/* Radial glow behind video */}
                   <div className="absolute inset-0 -inset-x-8 -inset-y-8 bg-[radial-gradient(circle,_rgba(138,154,44,0.08)_0%,_transparent_70%)] pointer-events-none" />
                   <video
@@ -498,14 +503,19 @@ export function OnesDifferenceSection() {
                     loop
                     muted
                     playsInline
-                    preload="metadata"
-                    onCanPlay={() => {
+                    preload="auto"
+                    disableRemotePlayback
+                    onLoadedData={() => {
                       const v = mobileVideoRef.current;
-                      if (v && v.paused) {
-                        v.play().catch(() => setMobileVideoBlocked(true));
+                      if (!v) return;
+                      v.muted = true;
+                      const p = v.play();
+                      if (p && typeof p.then === 'function') {
+                        p.catch(() => setMobileVideoBlocked(true));
                       }
                     }}
-                    className="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-xl bg-[#054700]/5"
+                    style={{ aspectRatio: '1 / 1' }}
+                    className="relative w-full h-auto rounded-2xl shadow-xl bg-[#054700]/5 object-cover"
                   />
                   {mobileVideoBlocked && (
                     <button
@@ -513,6 +523,7 @@ export function OnesDifferenceSection() {
                       onClick={() => {
                         const v = mobileVideoRef.current;
                         if (!v) return;
+                        v.muted = true;
                         v.play().then(() => setMobileVideoBlocked(false)).catch(() => {});
                       }}
                       aria-label="Play capsule formation video"
