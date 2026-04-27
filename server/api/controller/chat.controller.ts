@@ -19,6 +19,7 @@ import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import { detectRejectedIngredients, detectFormulationModeChange } from '../../modules/chat/preference-detector';
+import { mergeHealthArray } from '../../modules/users/health-data-merge';
 import { normalizeImageForVision } from '../../utils/fileAnalysis';
 import posthog from '../../infra/posthog';
 import { syncUserProperties } from '../../infra/posthog';
@@ -656,6 +657,45 @@ export class ChatController {
                         });
                     }
 
+                    // HARD ENFORCEMENT of user-rejected ingredients.
+                    // The prompt directive is a soft guardrail — LLMs sometimes ignore it
+                    // (especially when the rejected ingredient is a clinical-playbook standard
+                    // for the user's lab profile). Strip any rejected items that slipped back in.
+                    if (mergedRejected.length > 0 && validatedFormula) {
+                        const rejectedLc = new Set(mergedRejected.map(n => String(n).toLowerCase().trim()));
+                        const stripList = (arr: any[] | undefined) => {
+                            if (!Array.isArray(arr)) return { kept: [], removed: [] };
+                            const kept: any[] = [];
+                            const removed: string[] = [];
+                            for (const ing of arr) {
+                                const name = String(ing?.ingredient || ing?.name || '').toLowerCase().trim();
+                                if (name && rejectedLc.has(name)) {
+                                    removed.push(ing?.ingredient || ing?.name);
+                                } else {
+                                    kept.push(ing);
+                                }
+                            }
+                            return { kept, removed };
+                        };
+                        const basesResult = stripList(validatedFormula.bases);
+                        const additionsResult = stripList(validatedFormula.additions);
+                        const allRemoved = [...basesResult.removed, ...additionsResult.removed];
+                        if (allRemoved.length > 0) {
+                            validatedFormula.bases = basesResult.kept;
+                            validatedFormula.additions = additionsResult.kept;
+                            logger.warn('AI included user-rejected ingredients despite prompt directive — stripped server-side', {
+                                userId,
+                                sessionId: chatSession.id,
+                                rejectedList: mergedRejected,
+                                stripped: allRemoved,
+                            });
+                            sendSSE({
+                                type: 'info',
+                                message: `Removed ${allRemoved.join(', ')} from this formula — you previously asked to exclude ${allRemoved.length === 1 ? 'it' : 'them'}.`,
+                            });
+                        }
+                    }
+
                     const calcResult = validateAndCalculateFormula(validatedFormula);
                     validatedFormula.totalMg = calcResult.calculatedTotalMg;
 
@@ -671,7 +711,7 @@ export class ChatController {
                         sendSSE({ type: 'info', message: budgetFit.message });
                     }
 
-                    const expansion = autoExpandFormula(validatedFormula);
+                    const expansion = autoExpandFormula(validatedFormula, mergedRejected);
                     if (expansion.expanded) {
                         sendSSE({
                             type: 'info',
@@ -1061,20 +1101,51 @@ export class ChatController {
                                 logger.warn(`Blocked AI from clearing safety field: ${field}`, { userId });
                             } else if (Array.isArray(val)) {
                                 // Validate array items are strings and not absurdly long
-                                validatedHealthData[field] = val
+                                const sanitized = val
                                     .filter((item: unknown) => typeof item === 'string' && item.length <= 200)
                                     .slice(0, 50); // Cap at 50 items max
+
+                                // ── MERGE (don't overwrite) onto existing profile values.
+                                // Treat the AI's array as an additive delta: existing entries
+                                // always survive, new entries are appended, dupes deduped.
+                                // This prevents the silent-loss bug where a user mentions one
+                                // new supplement and the AI's reply blows away the rest.
+                                // To remove an entry, the user must edit via the UI.
+                                const existingFieldVal = (healthProfile as any)?.[field];
+                                const merged = mergeHealthArray(existingFieldVal, sanitized);
+                                if (merged.length === 0) {
+                                    // Nothing valid to write — drop the field rather than
+                                    // accidentally clearing it.
+                                    delete validatedHealthData[field];
+                                } else {
+                                    validatedHealthData[field] = merged;
+                                    if (Array.isArray(existingFieldVal) && merged.length === existingFieldVal.length && sanitized.length > 0) {
+                                        // No new items added — log for observability so we can
+                                        // see if the AI is constantly re-sending the same list.
+                                        logger.debug('Health array merge produced no new entries', { userId, field });
+                                    }
+                                }
                             }
                         }
                     }
 
                     // Validate non-safety array fields (healthGoals)
+                    // healthGoals is also merged (not overwritten) for the same reason as
+                    // the safety fields: a user adding "and also better sleep" shouldn't
+                    // wipe their existing goals if the AI only echoes the new one back.
                     const NON_SAFETY_ARRAY_FIELDS = ['healthGoals'] as const;
                     for (const field of NON_SAFETY_ARRAY_FIELDS) {
                         if (field in validatedHealthData && Array.isArray(validatedHealthData[field])) {
-                            validatedHealthData[field] = validatedHealthData[field]
+                            const sanitized = validatedHealthData[field]
                                 .filter((item: unknown) => typeof item === 'string' && item.length <= 200)
                                 .slice(0, 50);
+                            const existingFieldVal = (healthProfile as any)?.[field];
+                            const merged = mergeHealthArray(existingFieldVal, sanitized);
+                            if (merged.length === 0) {
+                                delete validatedHealthData[field];
+                            } else {
+                                validatedHealthData[field] = merged;
+                            }
                         }
                     }
 

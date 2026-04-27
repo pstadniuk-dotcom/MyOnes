@@ -251,7 +251,7 @@ export function autoFitFormulaToBudget(formula: any): {
     };
 }
 
-export function autoExpandFormula(formula: any): { expanded: boolean; addedIngredients: string[] } {
+export function autoExpandFormula(formula: any, rejectedIngredients: string[] = []): { expanded: boolean; addedIngredients: string[] } {
     const allIngredients = [...(formula.bases || []), ...(formula.additions || [])];
     const currentCount = allIngredients.length;
     const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
@@ -277,7 +277,7 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
         { name: 'Hawthorn Berry', minDose: 50, normalDose: 100, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
         { name: 'Cinnamon 20:1', minDose: 30, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
         { name: 'Magnesium', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential mineral for muscle relaxation, energy production, and nervous system function.' },
-    ];
+    ].filter(f => !rejectedIngredients.some(r => r.toLowerCase().trim() === f.name.toLowerCase()));
 
     const existingNames = new Set(allIngredients.map(i => i.ingredient.toLowerCase()));
     const addedIngredients: string[] = [];
@@ -391,6 +391,7 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
             ...(formula.bases || []).map((item: any) => item.ingredient.toLowerCase()),
             ...(formula.additions || []).map((item: any) => item.ingredient.toLowerCase()),
         ]);
+        const rejectedLc = new Set(rejectedIngredients.map(r => r.toLowerCase().trim()));
 
         const fallbackCandidates = [...INDIVIDUAL_INGREDIENTS]
             .map((ingredient) => {
@@ -403,6 +404,7 @@ export function autoExpandFormula(formula: any): { expanded: boolean; addedIngre
                 };
             })
             .filter((candidate) => !existing.has(candidate.ingredient.name.toLowerCase()))
+            .filter((candidate) => !rejectedLc.has(candidate.ingredient.name.toLowerCase()))
             .sort((a, b) => a.minAllowed - b.minAllowed);
 
         for (const candidate of fallbackCandidates) {
