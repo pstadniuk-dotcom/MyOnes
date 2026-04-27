@@ -54,7 +54,11 @@ function findActiveTier(tiers: ReturnType<typeof transformTiers>) {
 
 export default function MembershipPricingSectionV4() {
   const { user } = useAuth();
-  const ctaHref = user ? '/membership' : '/signup';
+  // Don't push membership purchase from the home page — funnel everyone into
+  // account creation / dashboard first. Membership selection happens later in
+  // the onboarding/consultation flow once they've actually engaged.
+  const ctaHref = user ? '/dashboard' : '/signup';
+  const ctaLabel = user ? 'Go to Your Dashboard' : 'Create Your Free Account';
   const sectionRef = useRef<HTMLElement>(null);
   const [revealed, setRevealed] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -219,13 +223,13 @@ export default function MembershipPricingSectionV4() {
               <Link href={ctaHref}>
                 <Button className="relative w-full bg-[#054700] hover:bg-[#053600] text-white py-6 text-lg rounded-full font-medium group overflow-hidden btn-shimmer shadow-lg shadow-[#054700]/20 hover:shadow-xl hover:shadow-[#054700]/25 transition-all duration-300">
                   <span className="relative z-[2] flex items-center justify-center">
-                    Claim Your {activeTier.name} Spot
+                    {ctaLabel}
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </Button>
               </Link>
               <p className="text-center text-[#054700]/25 text-xs mt-3 font-light">
-                Cancel anytime &middot; Rejoin within 3 months to keep your rate
+                No credit card required &middot; Pick your plan after signup
               </p>
             </div>
           </div>
