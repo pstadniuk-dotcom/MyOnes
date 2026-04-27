@@ -9,6 +9,7 @@ import {
   queryClient,
 } from "@/shared/lib/queryClient";
 import { buildApiUrl } from "@/shared/lib/api";
+import { capture as phCapture } from "@/shared/lib/posthog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
@@ -620,6 +621,11 @@ export default function CheckoutPage() {
       const errorCode = error?.code;
       const rawMessage = error?.message || "Please try again.";
       const parsedMessage = rawMessage.replace(/^\d+:\s*/, "");
+      phCapture('checkout_failed', {
+        formula_id: formulaId,
+        error_code: errorCode ?? null,
+        error_message: parsedMessage,
+      });
       if (
         errorCode === "PAYMENT_DECLINED" ||
         rawMessage.includes("PAYMENT_DECLINED") ||

@@ -27,6 +27,7 @@ import { logger } from "./infra/logging/logger";
 import { testEncryption } from "./infra/security/fieldEncryption";
 import cron from "node-cron";
 import { pool } from "./infra/db/db";
+import posthog from "./infra/posthog";
 // Verify encryption key works before accepting traffic
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -400,6 +401,13 @@ app.get('/api/health', (_req, res) => {
           logger.info('Database pool closed');
         } catch (err) {
           logger.error('Error closing database pool', { error: err });
+        }
+
+        try {
+          await posthog.shutdown();
+          logger.info('PostHog client flushed');
+        } catch (err) {
+          logger.error('Error shutting down PostHog', { error: err });
         }
 
         process.exit(0);

@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders } from '@/shared/lib/queryClient';
 import { buildApiUrl } from '@/shared/lib/api';
+import { capture as phCapture } from '@/shared/lib/posthog';
 import { Link, useSearch } from 'wouter';
 import ThinkingSteps, { type ThinkingStep } from '@/features/chat/components/ThinkingSteps';
 import { InlineCapsuleSelector } from '@/features/formulas/components/InlineCapsuleSelector';
@@ -1090,6 +1091,14 @@ export default function ConsultationPage() {
     clearDraft(); // Clear autosaved draft when message is sent
     initialInputRef.current = ''; // Clear voice input reference
     setIsTyping(true);
+
+    phCapture('chat_message_sent', {
+      session_id: currentSessionId ?? null,
+      is_new_session: isNewSession,
+      is_edit: !!editMessageId,
+      attachment_count: attachedFiles?.length ?? 0,
+      message_length: currentMessage.length,
+    });
 
     // Start analysis polling if files were uploaded
     if (attachedFiles && attachedFiles.length > 0) {

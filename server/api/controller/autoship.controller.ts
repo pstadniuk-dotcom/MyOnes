@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import logger from '../../infra/logging/logger';
 import { autoShipService } from '../../modules/billing/autoship.service';
+import posthog from '../../infra/posthog';
 
 export class AutoShipController {
   /** GET /api/auto-ship — current auto-ship status */
@@ -39,6 +40,7 @@ export class AutoShipController {
     try {
       const userId = req.userId!;
       const autoShip = await autoShipService.pauseAutoShip(userId);
+      posthog.capture({ distinctId: userId, event: 'auto_ship_paused', properties: { auto_ship_id: autoShip.id } });
       return res.json({
         status: autoShip.status,
         message: 'Auto-ship paused successfully. You can resume anytime.',
@@ -57,6 +59,11 @@ export class AutoShipController {
     try {
       const userId = req.userId!;
       const autoShip = await autoShipService.resumeAutoShip(userId);
+      posthog.capture({
+        distinctId: userId,
+        event: 'auto_ship_resumed',
+        properties: { auto_ship_id: autoShip.id, next_shipment_date: autoShip.nextShipmentDate },
+      });
       return res.json({
         status: autoShip.status,
         nextShipmentDate: autoShip.nextShipmentDate,
@@ -79,6 +86,7 @@ export class AutoShipController {
     try {
       const userId = req.userId!;
       const autoShip = await autoShipService.cancelAutoShip(userId);
+      posthog.capture({ distinctId: userId, event: 'auto_ship_cancelled', properties: { auto_ship_id: autoShip.id } });
       return res.json({
         status: autoShip.status,
         message: 'Auto-ship cancelled. You can still place manual orders anytime.',
@@ -97,6 +105,11 @@ export class AutoShipController {
     try {
       const userId = req.userId!;
       const autoShip = await autoShipService.skipNextShipment(userId);
+      posthog.capture({
+        distinctId: userId,
+        event: 'auto_ship_skipped',
+        properties: { auto_ship_id: autoShip.id, next_shipment_date: autoShip.nextShipmentDate },
+      });
       return res.json({
         status: autoShip.status,
         nextShipmentDate: autoShip.nextShipmentDate,

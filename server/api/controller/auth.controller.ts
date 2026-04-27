@@ -5,6 +5,8 @@ import { logger } from '../../infra/logging/logger';
 import { getClientIP, checkRateLimit, createSseTicket } from '../middleware/middleware';
 import { logAuthEvent } from '../../modules/auth/auth-audit';
 import { usersRepository } from '../../modules/users/users.repository';
+import posthog from '../../infra/posthog';
+import { syncUserProperties } from '../../infra/posthog';
 
 const REFRESH_TOKEN_COOKIE_NAME = 'ones_refresh_token';
 
@@ -59,6 +61,9 @@ export class AuthController {
             logger.info('Signup success', { userId: user.id, duration: `${Date.now() - startTime}ms` });
             logAuthEvent(req, { userId: user.id, email: user.email, action: 'signup', provider: 'email', success: true });
 
+            posthog.capture({ distinctId: user.id, event: 'user_signed_up', properties: { provider: 'email', email: user.email } });
+            void syncUserProperties(user.id);
+
             this.setRefreshTokenCookie(res, refreshToken);
 
             res.status(201).json({
@@ -102,6 +107,9 @@ export class AuthController {
 
             logger.info('Login success', { userId: user.id });
             logAuthEvent(req, { userId: user.id, email: user.email, action: 'login_success', provider: 'email', success: true });
+
+            posthog.capture({ distinctId: user.id, event: 'user_logged_in', properties: { provider: 'email' } });
+            void syncUserProperties(user.id);
 
             this.setRefreshTokenCookie(res, refreshToken);
 
@@ -154,6 +162,9 @@ export class AuthController {
             logger.info('Google login success', { userId: user.id });
             logAuthEvent(req, { userId: user.id, email: user.email, action: 'google_login', provider: 'google', success: true });
 
+            posthog.capture({ distinctId: user.id, event: 'user_logged_in', properties: { provider: 'google' } });
+            void syncUserProperties(user.id);
+
             this.setRefreshTokenCookie(res, refreshToken);
 
             res.json({
@@ -186,6 +197,9 @@ export class AuthController {
 
             logger.info('Facebook login success', { userId: user.id });
             logAuthEvent(req, { userId: user.id, email: user.email, action: 'facebook_login', provider: 'facebook', success: true });
+
+            posthog.capture({ distinctId: user.id, event: 'user_logged_in', properties: { provider: 'facebook' } });
+            void syncUserProperties(user.id);
 
             this.setRefreshTokenCookie(res, refreshToken);
 

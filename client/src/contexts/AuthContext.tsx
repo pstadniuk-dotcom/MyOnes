@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useToast } from '@/shared/hooks/use-toast';
 import { apiRequest } from '@/shared/lib/api';
 import { SESSION_EXPIRED_EVENT, queryClient } from '@/shared/lib/queryClient';
+import { identifyUser, resetPostHog, capture as phCapture } from '@/shared/lib/posthog';
 import type { AuthResponse, SignupData, LoginData } from '@shared/schema';
 
 interface User {
@@ -54,6 +55,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
 
+    resetPostHog();
+
     // Clear React Query cache to prevent stale data on next login
     queryClient.clear();
 
@@ -85,6 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const parsedUser = JSON.parse(storedUser);
           setToken(storedToken);
           setUser(parsedUser);
+          identifyUser(parsedUser);
 
           // Validate token with server
           await validateToken(storedToken);
@@ -177,6 +181,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      identifyUser(data.user);
+      phCapture('user_signed_up', { provider: 'email' });
+
       // Clear any stale cached data from previous sessions
       queryClient.clear();
 
@@ -228,6 +235,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      identifyUser(data.user);
+      phCapture('user_logged_in', { provider: 'email' });
+
       // Clear any stale cached data from previous sessions so fresh data is loaded
       queryClient.clear();
 
@@ -277,6 +287,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
+      identifyUser(data.user);
+      phCapture('user_logged_in', { provider: 'google' });
+
       // Clear any stale cached data from previous sessions so fresh data is loaded
       queryClient.clear();
 
@@ -323,6 +336,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(data.user);
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+
+      identifyUser(data.user);
+      phCapture('user_logged_in', { provider: 'facebook' });
 
       // Clear any stale cached data from previous sessions so fresh data is loaded
       queryClient.clear();
@@ -433,6 +449,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear auth state
       setToken(null);
       setUser(null);
+
+      resetPostHog();
 
       // Clear React Query cache to prevent stale data on next login
       queryClient.clear();

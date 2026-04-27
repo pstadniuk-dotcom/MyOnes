@@ -9,6 +9,7 @@ import { sendNotificationEmail } from '../../utils/emailService';
 import logger from '../../infra/logging/logger';
 import { type InsertFileUpload } from '@shared/schema';
 import { systemRepository } from '../system/system.repository';
+import posthog, { syncUserProperties } from '../../infra/posthog';
 
 /**
  * Classify a finished lab analysis into the right (analysisStatus, documentKind,
@@ -212,6 +213,17 @@ export class FilesService {
             const mimeType = uploadedFile.mimetype;
             const fileName = uploadedFile.name;
 
+            posthog.capture({
+                distinctId: userId,
+                event: 'lab_report_uploaded',
+                properties: {
+                    file_id: fileId,
+                    file_size_bytes: uploadedFile.size,
+                    mime_type: uploadedFile.mimetype,
+                },
+            });
+            void syncUserProperties(userId);
+
             // Record analysis start time
             await filesRepository.updateFileUpload(fileId, { analysisStartedAt: new Date() } as any);
 
@@ -303,6 +315,19 @@ export class FilesService {
                                 logger.info('No canonical merges occurred', { rawCount, dedupCount: uniqueKeys.size });
                             }
                             const markerCount = uniqueKeys.size;
+                            posthog.capture({
+                                distinctId: userId,
+                                event: 'lab_report_analyzed',
+                                properties: {
+                                    file_id: fileId,
+                                    marker_count: markerCount,
+                                    raw_marker_count: rawCount,
+                                    document_kind: outcome.documentKind,
+                                    analysis_status: outcome.analysisStatus,
+                                    test_type: labDataExtraction.testType ?? null,
+                                    lab_name: labDataExtraction.labName ?? null,
+                                },
+                            });
                             if (markerCount === 0) {
                                 logger.info('Skipping lab results notification — 0 biomarkers extracted', { userId, fileName });
                                 return;

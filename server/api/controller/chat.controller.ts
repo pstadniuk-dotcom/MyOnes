@@ -19,6 +19,8 @@ import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import { normalizeImageForVision } from '../../utils/fileAnalysis';
+import posthog from '../../infra/posthog';
+import { syncUserProperties } from '../../infra/posthog';
 import OpenAI from 'openai';
 import logger from '../../infra/logging/logger';
 import { logAiUsage, estimateTokenCount } from '../../modules/ai-usage/ai-usage.service';
@@ -724,6 +726,25 @@ export class ChatController {
                               informational: safetyResult.warnings.filter(w => w.severity === 'informational').length,
                             },
                           });
+
+                          posthog.capture({
+                            distinctId: userId,
+                            event: 'formula_generated',
+                            properties: {
+                              formula_id: savedFormula.id,
+                              version: nextVersion,
+                              is_first_formula: nextVersion === 1,
+                              ingredient_count: (savedFormula.bases?.length || 0) + (savedFormula.additions?.length || 0),
+                              base_count: savedFormula.bases?.length || 0,
+                              addition_count: savedFormula.additions?.length || 0,
+                              total_mg: savedFormula.totalMg,
+                              target_capsules: savedFormula.targetCapsules,
+                              requires_acknowledgment: safetyResult.requiresAcknowledgment,
+                              warning_count: safetyResult.warnings.length,
+                              serious_warning_count: safetyResult.warnings.filter(w => w.severity === 'serious').length,
+                            },
+                          });
+                          void syncUserProperties(userId);
 
                           // Lab value verification: warn if formula references biomarkers not in lab data
                           if (labDataContext && validatedFormula.rationale) {

@@ -18,6 +18,8 @@ import { subscriptions, autoShipSubscriptions } from '@shared/schema';
 import { billingService } from '../modules/billing/billing.service';
 import { autoShipService } from '../modules/billing/autoship.service';
 import logger from '../infra/logging/logger';
+import { runScheduledJob } from './schedulerRunner';
+import posthog from '../infra/posthog';
 
 // ──────────────────────────────────────────────────────────────
 // Membership Renewals
@@ -52,6 +54,11 @@ async function processMembershipRenewals() {
         const result = await billingService.processMembershipRenewal(sub.userId);
         if (result.success) {
           renewed++;
+          posthog.capture({
+            distinctId: sub.userId,
+            event: 'subscription_renewed',
+            properties: { subscription_id: sub.id, source: 'cron' },
+          });
         } else {
           failed++;
           logger.warn('[Renewal] Membership renewal failed', {
@@ -111,6 +118,11 @@ async function processAutoShipRenewals() {
       try {
         await autoShipService.processAutoShipRenewal(autoShip.id);
         renewed++;
+        posthog.capture({
+          distinctId: autoShip.userId,
+          event: 'auto_ship_renewed',
+          properties: { auto_ship_id: autoShip.id, source: 'cron' },
+        });
       } catch (err) {
         failed++;
         logger.error('[Renewal] Auto-ship renewal error', {
@@ -140,12 +152,18 @@ export function startRenewalScheduler() {
 
   // Membership renewals — daily at 9am UTC
   cron.schedule('0 9 * * *', async () => {
-    await processMembershipRenewals();
+    await runScheduledJob('renewal', async () => {
+      const summary = await processMembershipRenewals();
+      return { subtask: 'membership', ...summary };
+    });
   });
 
   // Auto-ship renewals — daily at 11am UTC (after pre-renewal quote refresh at 8am)
   cron.schedule('0 11 * * *', async () => {
-    await processAutoShipRenewals();
+    await runScheduledJob('renewal', async () => {
+      const summary = await processAutoShipRenewals();
+      return { subtask: 'autoship', ...summary };
+    });
   });
 
   logger.info('[Renewal] Scheduler started — membership 9am UTC, auto-ship 11am UTC');

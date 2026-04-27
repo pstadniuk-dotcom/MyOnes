@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import logger from '../../infra/logging/logger';
 import { billingService } from '../../modules/billing/billing.service';
+import posthog from '../../infra/posthog';
+import { syncUserProperties } from '../../infra/posthog';
 
 const addressSchema = z.object({
   firstName: z.string().min(1).max(100),
@@ -83,6 +85,35 @@ export class BillingController {
         return res.status(400).json({ error: 'Invalid checkout data', details: parsed.error.flatten().fieldErrors });
       }
       const result = await billingService.processCheckout(userId, parsed.data, req);
+      posthog.capture({
+        distinctId: userId,
+        event: 'checkout_completed',
+        properties: {
+          plan: parsed.data.plan,
+          include_membership: parsed.data.includeMembership,
+          enable_auto_ship: parsed.data.enableAutoShip,
+          has_formula: !!parsed.data.formulaId,
+          has_discount_code: !!parsed.data.discountCode,
+          order_id: (result as any)?.orderId,
+          total_cents: (result as any)?.totalCents,
+        },
+      });
+      // Fire derived lifecycle events so funnels in PostHog stay clean
+      if (parsed.data.includeMembership) {
+        posthog.capture({
+          distinctId: userId,
+          event: 'subscription_started',
+          properties: { plan: parsed.data.plan, source: 'checkout' },
+        });
+      }
+      if (parsed.data.enableAutoShip) {
+        posthog.capture({
+          distinctId: userId,
+          event: 'auto_ship_enabled',
+          properties: { source: 'checkout' },
+        });
+      }
+      void syncUserProperties(userId);
       return res.json(result);
     } catch (error: any) {
       if (error?.message === 'ALREADY_ACTIVE_MEMBER') {
@@ -173,6 +204,8 @@ export class BillingController {
       const userId = req.userId!;
       const { subscriptionId } = req.params;
       const result = await billingService.cancelSubscription(userId, subscriptionId);
+      posthog.capture({ distinctId: userId, event: 'subscription_cancelled', properties: { subscription_id: subscriptionId } });
+      void syncUserProperties(userId);
       return res.json(result);
     } catch (error: any) {
       if (error?.message === 'USER_NOT_FOUND') {
@@ -191,6 +224,8 @@ export class BillingController {
       const userId = req.userId!;
       const { subscriptionId } = req.params;
       const result = await billingService.resumeSubscription(userId, subscriptionId);
+      posthog.capture({ distinctId: userId, event: 'subscription_resumed', properties: { subscription_id: subscriptionId } });
+      void syncUserProperties(userId);
       return res.json(result);
     } catch (error: any) {
       if (error?.message === 'USER_NOT_FOUND') {

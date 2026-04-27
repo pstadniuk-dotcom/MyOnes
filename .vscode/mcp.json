@@ -6,6 +6,19 @@
       "env": {
         "API_KEY": "ff6e276d14ad9627821c4c86addc0acdcbf301f3a219142e05575af63faa952e"
       }
+    },
+    "posthog": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote@latest", "https://mcp.posthog.com/sse", "--header", "Authorization:${input:posthog_personal_api_key}"]
     }
-  }
+  },
+  "inputs": [
+    {
+      "id": "posthog_personal_api_key",
+      "type": "promptString",
+      "description": "PostHog personal API key (format: 'Bearer phx_...'). Create one at https://us.posthog.com/settings/user-api-keys with scopes: read query, read insights, read dashboards, read feature_flags, read errors",
+      "password": true
+    }
+  ]
 }
+
