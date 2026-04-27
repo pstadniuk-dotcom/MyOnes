@@ -554,3 +554,58 @@ export function verifyEpdWebhookSignature(
 }
 
 export const epdGateway = new EpdGateway();
+
+// ── Transaction-state XML parser ────────────────────────────────────────
+// EPD's /query.php returns XML like:
+//   <nm_response>
+//     <transaction>
+//       <transaction_id>...</transaction_id>
+//       <condition>complete|pending|failed|...</condition>
+//       <action>
+//         <action_type>sale|refund|void|auth|capture</action_type>
+//         <amount>10.00</amount>
+//         <date>YYYYMMDDHHmmss</date>
+//         <success>1|0</success>
+//         <response_text>...</response_text>
+//       </action>
+//       (potentially multiple <action> blocks — refunds appear as later actions)
+//     </transaction>
+//   </nm_response>
+// We extract the headline state plus the last action.
+
+export interface ParsedTransactionState {
+  transactionId: string | null;
+  condition: string | null;
+  lastActionType: string | null;
+  lastAmount: string | null;
+  lastDate: string | null;
+  lastSuccess: boolean | null;
+  lastResponseText: string | null;
+  raw: string;
+}
+
+function pickInner(xml: string, tag: string): string | null {
+  const m = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+  return m ? m[1].trim() : null;
+}
+
+export function parseTransactionStateXml(xml: string): ParsedTransactionState {
+  const txnBlock = pickInner(xml, 'transaction') ?? xml;
+  const transactionId = pickInner(txnBlock, 'transaction_id');
+  const condition = pickInner(txnBlock, 'condition');
+
+  // Grab the LAST <action>...</action> block (most recent state change).
+  const actionMatches = [...txnBlock.matchAll(/<action>([\s\S]*?)<\/action>/g)];
+  const lastAction = actionMatches.length > 0 ? actionMatches[actionMatches.length - 1][1] : '';
+
+  return {
+    transactionId,
+    condition,
+    lastActionType: lastAction ? pickInner(lastAction, 'action_type') : null,
+    lastAmount: lastAction ? pickInner(lastAction, 'amount') : null,
+    lastDate: lastAction ? pickInner(lastAction, 'date') : null,
+    lastSuccess: lastAction ? pickInner(lastAction, 'success') === '1' : null,
+    lastResponseText: lastAction ? pickInner(lastAction, 'response_text') : null,
+    raw: xml,
+  };
+}

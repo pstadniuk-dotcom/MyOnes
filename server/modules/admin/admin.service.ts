@@ -11,7 +11,8 @@ import { formulasRepository } from '../formulas/formulas.repository';
 import { wearablesService } from '../wearables/wearables.service';
 import { getFrontendUrl } from '../../utils/urlHelper';
 import { escapeHtml } from '../../utils/sanitize';
-import { epdGateway, isApproved } from '../billing/epd-gateway';
+import { epdGateway, isApproved, parseTransactionStateXml } from '../billing/epd-gateway';
+import { billingService } from '../billing/billing.service';
 
 const VALID_ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 
@@ -1177,6 +1178,133 @@ Return ONLY valid JSON.`;
             logger.error('EPD refund request failed', { orderId, error: err });
             return { success: false, error: 'Payment gateway error — please try again or refund via EPD console.' };
         }
+    }
+
+    // ── Admin order ops: cancel/void/test-flag/notes/activity/refunds/state ──
+
+    async cancelOrderAsAdmin(params: { orderId: string; reason: string }): Promise<{ orderId: string; status: 'cancelled' }> {
+        return billingService.adminCancelOrder(params);
+    }
+
+    async voidOrderAsAdmin(params: { orderId: string; reason: string }): Promise<{ orderId: string; refundId: string; voidTransactionId: string }> {
+        return billingService.adminVoidOrder(params);
+    }
+
+    async setTestOrderFlag(orderId: string, isTest: boolean) {
+        const order = await adminRepository.setOrderTestFlag(orderId, isTest);
+        if (!order) throw new Error('ORDER_NOT_FOUND');
+        return order;
+    }
+
+    async resendOrderConfirmation(orderId: string): Promise<{ sent: boolean; reason?: string }> {
+        const payload = await billingService.buildOrderConfirmationEmail(orderId);
+        if (!payload) return { sent: false, reason: 'Order or user email unavailable' };
+        try {
+            await sendNotificationEmail(payload);
+            return { sent: true };
+        } catch (err) {
+            logger.error('Failed to resend order confirmation', { error: err, orderId });
+            return { sent: false, reason: 'Email send failed' };
+        }
+    }
+
+    async resendShippingNotification(orderId: string): Promise<{ sent: boolean; reason?: string }> {
+        const payload = await billingService.buildShippingNotificationEmail(orderId);
+        if (!payload) return { sent: false, reason: 'Order is not shipped or has no tracking URL' };
+        try {
+            await sendNotificationEmail(payload);
+            return { sent: true };
+        } catch (err) {
+            logger.error('Failed to resend shipping notification', { error: err, orderId });
+            return { sent: false, reason: 'Email send failed' };
+        }
+    }
+
+    async getOrderRefunds(orderId: string) {
+        return adminRepository.getOrderRefunds(orderId);
+    }
+
+    async getOrderActivity(orderId: string, options: { limit?: number; offset?: number } = {}) {
+        return adminRepository.getOrderActivity(orderId, options);
+    }
+
+    async getEpdTransactionState(orderId: string) {
+        const order = await usersRepository.getOrder(orderId);
+        if (!order) throw new Error('ORDER_NOT_FOUND');
+        if (!order.gatewayTransactionId) throw new Error('NO_GATEWAY_TRANSACTION');
+        const xml = await epdGateway.queryTransaction(order.gatewayTransactionId);
+        const parsed = parseTransactionStateXml(xml);
+        return parsed;
+    }
+
+    // ── Order notes ──
+
+    async listOrderNotes(orderId: string) {
+        return adminRepository.listOrderNotes(orderId);
+    }
+
+    async createOrderNote(payload: { orderId: string; adminId: string; body: string }) {
+        if (!payload.body || payload.body.trim().length === 0) throw new Error('BODY_REQUIRED');
+        return adminRepository.createOrderNote({
+            orderId: payload.orderId,
+            adminId: payload.adminId,
+            body: payload.body.trim(),
+        });
+    }
+
+    async updateOrderNote(noteId: string, body: string, adminId: string) {
+        if (!body || body.trim().length === 0) throw new Error('BODY_REQUIRED');
+        const existing = await adminRepository.getOrderNote(noteId);
+        if (!existing) throw new Error('NOTE_NOT_FOUND');
+        if (existing.adminId !== adminId) throw new Error('NOT_OWNER');
+        return adminRepository.updateOrderNote(noteId, body.trim());
+    }
+
+    async deleteOrderNote(noteId: string, adminId: string) {
+        const existing = await adminRepository.getOrderNote(noteId);
+        if (!existing) throw new Error('NOTE_NOT_FOUND');
+        if (existing.adminId !== adminId) throw new Error('NOT_OWNER');
+        return adminRepository.deleteOrderNote(noteId);
+    }
+
+    // ── Tracking (extended) ──
+
+    async updateOrderTrackingFields(orderId: string, payload: { trackingNumber?: string | null; carrier?: string | null; trackingUrl?: string | null }) {
+        const allowedCarriers = ['ups', 'fedex', 'dhl', 'usps'];
+        if (payload.carrier && !allowedCarriers.includes(payload.carrier)) {
+            throw new Error('INVALID_CARRIER');
+        }
+        const order = await adminRepository.updateOrderTrackingFields(orderId, payload);
+        if (!order) throw new Error('ORDER_NOT_FOUND');
+
+        // Best-effort EPD update for chargeback defense — only when we have all of: txn, number, carrier
+        if (order.gatewayTransactionId && payload.trackingNumber && payload.carrier) {
+            try {
+                await epdGateway.updateTransaction(order.gatewayTransactionId, {
+                    tracking_number: payload.trackingNumber,
+                    shipping_carrier: payload.carrier as any,
+                    shipping_date: order.shippedAt ? order.shippedAt.toISOString().slice(0, 10).replace(/-/g, '') : undefined,
+                });
+            } catch (err) {
+                logger.warn('Failed to push tracking to EPD', { err, orderId });
+            }
+        }
+        return order;
+    }
+
+    // ── Bulk status update ──
+
+    async bulkUpdateOrderStatus(payload: { orderIds: string[]; status: string; trackingUrl?: string }): Promise<Array<{ orderId: string; ok: boolean; error?: string }>> {
+        const results: Array<{ orderId: string; ok: boolean; error?: string }> = [];
+        for (const orderId of payload.orderIds) {
+            try {
+                const order = await this.updateOrderStatus(orderId, payload.status, payload.trackingUrl);
+                results.push({ orderId, ok: !!order });
+            } catch (err: any) {
+                results.push({ orderId, ok: false, error: err?.message || 'unknown' });
+            }
+        }
+        return results;
     }
 }
 

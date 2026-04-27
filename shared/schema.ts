@@ -41,6 +41,8 @@ export const adminActionEnum = pgEnum('admin_action', [
   'user_delete', 'user_suspend', 'user_unsuspend', 'user_admin_grant', 'user_admin_revoke',
   'user_view', 'user_note_add', 'data_export', 'conversation_view',
   'order_status_change', 'order_refund', 'manufacturer_order_retry',
+  'order_cancel_no_refund', 'order_void', 'order_email_resent', 'order_test_flag',
+  'order_note_add', 'order_internal_view',
   'ticket_status_change', 'ticket_assign', 'ticket_reply',
   'settings_update', 'settings_reset',
   'faq_create', 'faq_update', 'faq_delete',
@@ -450,6 +452,9 @@ export const orders = pgTable("orders", {
   gatewayTransactionId: text("gateway_transaction_id"), // EPD transaction ID that funded this order
   autoShipSubscriptionId: varchar("auto_ship_subscription_id"), // Set when order created by auto-ship
   trackingUrl: text("tracking_url"),
+  trackingNumber: text("tracking_number"),
+  carrier: text("carrier"), // 'ups' | 'fedex' | 'dhl' | 'usps'
+  isTestOrder: boolean("is_test_order").default(false).notNull(),
   placedAt: timestamp("placed_at").defaultNow().notNull(),
   shippedAt: timestamp("shipped_at"),
   currency: text("currency").default('USD').notNull(),
@@ -502,7 +507,28 @@ export const orders = pgTable("orders", {
   index("orders_status_idx").on(table.status),
   index("orders_placed_at_idx").on(table.placedAt),
   index("orders_gateway_transaction_idx").on(table.gatewayTransactionId),
+  index("orders_is_test_order_idx").on(table.isTestOrder),
 ]);
+
+// Order notes — admin-authored, mutable, attributable
+export const orderNotes = pgTable("order_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  adminId: varchar("admin_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("order_notes_order_idx").on(table.orderId),
+]);
+
+export const insertOrderNoteSchema = createInsertSchema(orderNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOrderNote = z.infer<typeof insertOrderNoteSchema>;
+export type OrderNote = typeof orderNotes.$inferSelect;
 
 // Ingredient pricing reference for equivalent stack estimates
 export const ingredientPricing = pgTable("ingredient_pricing", {
@@ -2459,6 +2485,26 @@ export const outreachPitches = pgTable("outreach_pitches", {
   qualityFlags: json("quality_flags").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/** Generic per-tick run history for ALL background schedulers (blog, PR agent,
+ *  auto-ship, renewal, etc.). One row per cron tick. Powers the admin Agents
+ *  dashboard. PR Agent's per-engine detail still goes to `agent_runs` below. */
+export const schedulerRuns = pgTable("scheduler_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  schedulerName: varchar("scheduler_name", { length: 64 }).notNull(),
+  status: agentRunStatusEnum("status").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  durationMs: integer("duration_ms"),
+  // Free-form structured result (e.g. { generated: 5, failed: 0 }). Shown in dashboard.
+  summary: json("summary").$type<Record<string, any>>(),
+  errorMessage: text("error_message"),
+  triggeredBy: varchar("triggered_by", { length: 32 }).default('cron').notNull(), // 'cron' | 'manual'
+});
+
+export const insertSchedulerRunSchema = createInsertSchema(schedulerRuns).omit({ id: true, startedAt: true });
+export type SchedulerRun = typeof schedulerRuns.$inferSelect;
+export type InsertSchedulerRun = z.infer<typeof insertSchedulerRunSchema>;
 
 /** Agent run history for auditing and debugging */
 export const agentRuns = pgTable("agent_runs", {

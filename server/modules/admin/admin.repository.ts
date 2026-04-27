@@ -22,7 +22,12 @@ import {
     influencerContent,
     b2bProspects,
     b2bOutreach,
+    orderNotes,
+    refunds,
+    adminAuditLogs,
     type User,
+    type OrderNote,
+    type InsertOrderNote,
     type Formula,
     type Order,
     type SupportTicket,
@@ -1711,11 +1716,32 @@ export class AdminRepository {
 
     async getAllOrders(options: any): Promise<{ orders: any[], total: number }> {
         try {
-            const { status, limit = 50, offset = 0, startDate, endDate } = options;
+            const { status, limit = 50, offset = 0, startDate, endDate, search, hideTestOrders, hasDiscountCode } = options;
             let whereConditions = [];
             if (status && status !== 'all') whereConditions.push(eq(orders.status, status as any));
             if (startDate) whereConditions.push(gte(orders.placedAt, startDate));
             if (endDate) whereConditions.push(lte(orders.placedAt, endDate));
+            if (hideTestOrders) whereConditions.push(eq(orders.isTestOrder, false));
+            if (hasDiscountCode) whereConditions.push(isNotNull(orders.discountCodeId));
+
+            // Server-side search across order fields + customer name/email.
+            if (search && typeof search === 'string' && search.trim().length > 0) {
+                const term = `%${search.trim()}%`;
+                // Resolve matching user IDs in a small first query so the main query stays JOIN-free.
+                const matchingUsers = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(or(ilike(users.name, term), ilike(users.email, term)));
+                const matchingUserIds = matchingUsers.map(u => u.id);
+
+                const orFilters: any[] = [
+                    ilike(orders.id, term),
+                    ilike(orders.gatewayTransactionId, term),
+                    ilike(orders.trackingNumber, term),
+                ];
+                if (matchingUserIds.length > 0) orFilters.push(inArray(orders.userId, matchingUserIds));
+                whereConditions.push(or(...orFilters));
+            }
 
             const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
             const [countResult] = await db.select({ count: count() }).from(orders).where(whereClause);
@@ -1756,6 +1782,111 @@ export class AdminRepository {
         } catch (error) {
             logger.error('Error updating order status', { error });
             return undefined;
+        }
+    }
+
+    async setOrderTestFlag(id: string, isTest: boolean): Promise<Order | undefined> {
+        try {
+            const [order] = await db.update(orders).set({ isTestOrder: isTest }).where(eq(orders.id, id)).returning();
+            return order || undefined;
+        } catch (error) {
+            logger.error('Error setting test flag', { error, id });
+            return undefined;
+        }
+    }
+
+    async updateOrderTrackingFields(id: string, payload: { trackingNumber?: string | null; carrier?: string | null; trackingUrl?: string | null }): Promise<Order | undefined> {
+        try {
+            const updates: any = {};
+            if (payload.trackingNumber !== undefined) updates.trackingNumber = payload.trackingNumber;
+            if (payload.carrier !== undefined) updates.carrier = payload.carrier;
+            if (payload.trackingUrl !== undefined) updates.trackingUrl = payload.trackingUrl;
+            const [order] = await db.update(orders).set(updates).where(eq(orders.id, id)).returning();
+            return order || undefined;
+        } catch (error) {
+            logger.error('Error updating order tracking', { error, id });
+            return undefined;
+        }
+    }
+
+    async listOrderNotes(orderId: string): Promise<OrderNote[]> {
+        try {
+            return await db.select().from(orderNotes).where(eq(orderNotes.orderId, orderId)).orderBy(desc(orderNotes.createdAt));
+        } catch (error) {
+            logger.error('Error listing order notes', { error, orderId });
+            return [];
+        }
+    }
+
+    async createOrderNote(payload: InsertOrderNote): Promise<OrderNote> {
+        const [note] = await db.insert(orderNotes).values(payload).returning();
+        return note;
+    }
+
+    async getOrderNote(noteId: string): Promise<OrderNote | undefined> {
+        try {
+            const [note] = await db.select().from(orderNotes).where(eq(orderNotes.id, noteId));
+            return note || undefined;
+        } catch (error) {
+            logger.error('Error fetching order note', { error, noteId });
+            return undefined;
+        }
+    }
+
+    async updateOrderNote(noteId: string, body: string): Promise<OrderNote | undefined> {
+        try {
+            const [note] = await db.update(orderNotes).set({ body, updatedAt: new Date() }).where(eq(orderNotes.id, noteId)).returning();
+            return note || undefined;
+        } catch (error) {
+            logger.error('Error updating order note', { error, noteId });
+            return undefined;
+        }
+    }
+
+    async deleteOrderNote(noteId: string): Promise<boolean> {
+        try {
+            await db.delete(orderNotes).where(eq(orderNotes.id, noteId));
+            return true;
+        } catch (error) {
+            logger.error('Error deleting order note', { error, noteId });
+            return false;
+        }
+    }
+
+    async getOrderRefunds(orderId: string): Promise<any[]> {
+        try {
+            return await db.select().from(refunds).where(eq(refunds.orderId, orderId)).orderBy(desc(refunds.createdAt));
+        } catch (error) {
+            logger.error('Error listing refunds for order', { error, orderId });
+            return [];
+        }
+    }
+
+    async getOrderActivity(orderId: string, options: { limit?: number; offset?: number } = {}): Promise<{ rows: any[]; total: number }> {
+        const { limit = 50, offset = 0 } = options;
+        try {
+            const where = and(eq(adminAuditLogs.targetType, 'order'), eq(adminAuditLogs.targetId, orderId));
+            const [countRow] = await db.select({ n: count() }).from(adminAuditLogs).where(where);
+            const rows = await db
+                .select({
+                    id: adminAuditLogs.id,
+                    action: adminAuditLogs.action,
+                    details: adminAuditLogs.details,
+                    createdAt: adminAuditLogs.createdAt,
+                    adminId: adminAuditLogs.adminId,
+                    adminName: users.name,
+                    adminEmail: users.email,
+                })
+                .from(adminAuditLogs)
+                .leftJoin(users, eq(adminAuditLogs.adminId, users.id))
+                .where(where)
+                .orderBy(desc(adminAuditLogs.createdAt))
+                .limit(limit)
+                .offset(offset);
+            return { rows, total: Number(countRow?.n ?? 0) };
+        } catch (error) {
+            logger.error('Error fetching order activity', { error, orderId });
+            return { rows: [], total: 0 };
         }
     }
 

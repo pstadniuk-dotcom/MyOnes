@@ -115,6 +115,14 @@ export interface BillingProvider {
   }>;
   processMembershipRenewal(userId: string): Promise<{ success: boolean; error?: string }>;
   cancelOrder(userId: string, orderId: string): Promise<{ success: boolean; message: string }>;
+  adminCancelOrder(params: { orderId: string; reason: string }): Promise<{ orderId: string; status: 'cancelled' }>;
+  adminVoidOrder(params: { orderId: string; reason: string }): Promise<{ orderId: string; refundId: string; voidTransactionId: string }>;
+  buildOrderConfirmationEmail(orderId: string): Promise<{
+    to: string; subject: string; title: string; content: string; actionUrl: string; actionText: string; type: 'order_update';
+  } | null>;
+  buildShippingNotificationEmail(orderId: string): Promise<{
+    to: string; subject: string; title: string; content: string; actionUrl: string; actionText: string; type: 'order_update';
+  } | null>;
   settleOrder(orderId: string): Promise<void>;
   executePayouts(orderId: string): Promise<void>;
   executeRefund(refundId: string): Promise<void>;
@@ -926,6 +934,179 @@ class DatabaseBillingProvider implements BillingProvider {
     return { success: true, message: 'Order cancelled and refund initiated.' };
   }
 
+  // ── Admin Order Actions ──────────────────────────────────────────────
+
+  /**
+   * Best-effort manufacturer cancellation, mirrors the inline block in `cancelOrder`.
+   * Updates the order's `manufacturerOrderStatus` to 'cancelled' or 'cancellation_failed'.
+   */
+  private async tryCancelManufacturerOrder(order: { id: string; manufacturerOrderId: string | null }): Promise<void> {
+    if (!order.manufacturerOrderId) return;
+    try {
+      const cancelResult = await manufacturerPricingService.cancelManufacturerOrder(order.manufacturerOrderId);
+      if (cancelResult.success) {
+        await usersRepository.updateOrder(order.id, { manufacturerOrderStatus: 'cancelled' });
+        logger.info('Manufacturer order cancelled at Alive', { orderId: order.id, manufacturerOrderId: order.manufacturerOrderId });
+      } else {
+        await usersRepository.updateOrder(order.id, { manufacturerOrderStatus: 'cancellation_failed' });
+        logger.error('[CRITICAL] Alive cancel failed - manual intervention required', {
+          orderId: order.id,
+          manufacturerOrderId: order.manufacturerOrderId,
+          tooLate: cancelResult.tooLate,
+          alreadyCancelled: cancelResult.alreadyCancelled,
+          error: cancelResult.error,
+        });
+      }
+    } catch (cancelErr) {
+      await usersRepository.updateOrder(order.id, { manufacturerOrderStatus: 'cancellation_failed' });
+      logger.error('[CRITICAL] Exception calling Alive cancel-order', {
+        orderId: order.id,
+        manufacturerOrderId: order.manufacturerOrderId,
+        error: cancelErr instanceof Error ? cancelErr.message : String(cancelErr),
+      });
+    }
+  }
+
+  /**
+   * Admin-initiated cancel WITHOUT refund. Sets status to cancelled and best-effort
+   * cancels the manufacturer order. Does NOT touch EPD. Use this when the customer
+   * was comp'd out-of-band, or for orders that never settled and don't need refunding.
+   */
+  async adminCancelOrder(params: { orderId: string; reason: string }): Promise<{ orderId: string; status: 'cancelled' }> {
+    const { orderId } = params;
+    const order = await usersRepository.getOrder(orderId);
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.status === 'cancelled') throw new Error('ALREADY_CANCELLED');
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      throw new Error('CANNOT_CANCEL_SHIPPED');
+    }
+
+    await usersRepository.updateOrder(orderId, { status: 'cancelled' });
+    await this.tryCancelManufacturerOrder({ id: order.id, manufacturerOrderId: order.manufacturerOrderId });
+
+    logger.info('Admin cancelled order without refund', { orderId, reason: params.reason });
+    return { orderId, status: 'cancelled' };
+  }
+
+  /**
+   * Admin-initiated EPD void. Reverses an unsettled transaction, creates a `refunds` row
+   * with status='voided', cancels the order + manufacturer order. Throws VOID_REJECTED if
+   * EPD declines (e.g. transaction has already settled — use refund instead).
+   */
+  async adminVoidOrder(params: { orderId: string; reason: string }): Promise<{ orderId: string; refundId: string; voidTransactionId: string }> {
+    const { orderId, reason } = params;
+    const order = await usersRepository.getOrder(orderId);
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (!order.gatewayTransactionId) throw new Error('NO_GATEWAY_TRANSACTION');
+    if (order.status === 'cancelled') throw new Error('ALREADY_CANCELLED');
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      throw new Error('CANNOT_VOID_SHIPPED');
+    }
+
+    const voidResult = await epdGateway.voidTransaction(order.gatewayTransactionId);
+    if (!isApproved(voidResult)) {
+      logger.warn('EPD void rejected', { orderId, responsetext: voidResult.responsetext });
+      throw new Error(`VOID_REJECTED: ${voidResult.responsetext}`);
+    }
+
+    const refund = await usersRepository.createRefund({
+      userId: order.userId,
+      orderId,
+      status: 'voided',
+      transactionId: voidResult.transactionid,
+      parentTransactionId: order.gatewayTransactionId,
+      amountCents: order.amountCents || 0,
+      currency: order.currency || 'USD',
+      gatewayResponse: voidResult,
+      reason: `Admin void: ${reason}`,
+      modeOfFund: order.paymentMode || 'card',
+    });
+
+    await usersRepository.updateOrder(orderId, { status: 'cancelled' });
+    await this.tryCancelManufacturerOrder({ id: order.id, manufacturerOrderId: order.manufacturerOrderId });
+
+    logger.info('Admin voided order', { orderId, voidTransactionId: voidResult.transactionid });
+    return { orderId, refundId: refund.id, voidTransactionId: voidResult.transactionid! };
+  }
+
+  /**
+   * Build the order-confirmation email payload for a given order. Caller invokes
+   * sendNotificationEmail with the result.
+   */
+  async buildOrderConfirmationEmail(orderId: string): Promise<{
+    to: string;
+    subject: string;
+    title: string;
+    content: string;
+    actionUrl: string;
+    actionText: string;
+    type: 'order_update';
+  } | null> {
+    const order = await usersRepository.getOrder(orderId);
+    if (!order) return null;
+    const user = await usersRepository.getUser(order.userId);
+    if (!user?.email) return null;
+    const formula = order.formulaId ? await formulasRepository.getFormula(order.formulaId) : null;
+
+    const itemLines: string[] = [];
+    if (formula) {
+      const formulaLabel = formula.name || `Formula v${formula.version}`;
+      itemLines.push(`<li>${formulaLabel}</li>`);
+    }
+
+    const dashboardUrl = `${getFrontendUrl()}/dashboard/formula`;
+    const totalDollars = order.amountCents ? (order.amountCents / 100).toFixed(2) : '0.00';
+
+    return {
+      to: user.email,
+      subject: `Your ONES Order is Confirmed (#${orderId.slice(0, 8)})`,
+      title: 'Order Confirmed',
+      content: `<p>Thank you for your order!</p>
+        <ul>${itemLines.join('')}</ul>
+        <p><strong>Total charged:</strong> $${totalDollars}</p>
+        <p>Your custom formula will be manufactured and shipped within 5-7 business days. We'll send you tracking info when it ships.</p>`,
+      actionUrl: dashboardUrl,
+      actionText: 'View Your Formula',
+      type: 'order_update',
+    };
+  }
+
+  /**
+   * Build the shipping-notification email payload. Returns null if the order
+   * isn't shipped yet (no shippedAt or no trackingUrl).
+   */
+  async buildShippingNotificationEmail(orderId: string): Promise<{
+    to: string;
+    subject: string;
+    title: string;
+    content: string;
+    actionUrl: string;
+    actionText: string;
+    type: 'order_update';
+  } | null> {
+    const order = await usersRepository.getOrder(orderId);
+    if (!order) return null;
+    if (!order.shippedAt || !order.trackingUrl) return null;
+    const user = await usersRepository.getUser(order.userId);
+    if (!user?.email) return null;
+
+    const trackingLine = order.trackingNumber
+      ? `<p><strong>Tracking #:</strong> ${order.trackingNumber}${order.carrier ? ` (${order.carrier.toUpperCase()})` : ''}</p>`
+      : '';
+
+    return {
+      to: user.email,
+      subject: `Your ONES Order Has Shipped (#${orderId.slice(0, 8)})`,
+      title: 'Your Order Is On Its Way',
+      content: `<p>Good news — your custom formula is on its way!</p>
+        ${trackingLine}
+        <p>Click below to track your package.</p>`,
+      actionUrl: order.trackingUrl,
+      actionText: 'Track Shipment',
+      type: 'order_update',
+    };
+  }
+
   // ── Order Settlement ──────────────────────────────────────────────────
 
   async settleOrder(orderId: string): Promise<void> {
@@ -1297,6 +1478,10 @@ export class BillingService {
   resumeSubscription(userId: string, subscriptionId: string) { return this.provider.resumeSubscription(userId, subscriptionId); }
   processMembershipRenewal(userId: string) { return this.provider.processMembershipRenewal(userId); }
   cancelOrder(userId: string, orderId: string) { return this.provider.cancelOrder(userId, orderId); }
+  adminCancelOrder(params: { orderId: string; reason: string }) { return this.provider.adminCancelOrder(params); }
+  adminVoidOrder(params: { orderId: string; reason: string }) { return this.provider.adminVoidOrder(params); }
+  buildOrderConfirmationEmail(orderId: string) { return this.provider.buildOrderConfirmationEmail(orderId); }
+  buildShippingNotificationEmail(orderId: string) { return this.provider.buildShippingNotificationEmail(orderId); }
   settleOrder(orderId: string) { return this.provider.settleOrder(orderId); }
   executePayouts(orderId: string) { return this.provider.executePayouts(orderId); }
   executeRefund(refundId: string) { return this.provider.executeRefund(refundId); }

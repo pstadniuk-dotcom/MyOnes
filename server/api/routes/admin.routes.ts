@@ -70,6 +70,22 @@ router.patch('/orders/:id/status', requireAdmin, adminController.updateOrderStat
 router.post('/orders/:id/refund', requireAdmin, adminController.refundOrder);
 router.post('/orders/:id/retry-manufacturer', requireAdmin, adminController.retryManufacturerOrder);
 router.post('/orders/:id/tracking', requireAdmin, adminController.updateOrderTracking);
+router.patch('/orders/:id/tracking-fields', requireAdmin, adminController.updateOrderTrackingFields);
+
+// Order Management — extended admin actions
+router.post('/orders/:id/cancel', requireAdmin, adminController.cancelOrderNoRefund);
+router.post('/orders/:id/void', requireAdmin, adminController.voidOrder);
+router.post('/orders/:id/resend-confirmation', requireAdmin, adminController.resendOrderConfirmation);
+router.post('/orders/:id/resend-shipping', requireAdmin, adminController.resendShippingNotification);
+router.patch('/orders/:id/test-flag', requireAdmin, adminController.setOrderTestFlag);
+router.get('/orders/:id/activity', requireAdmin, adminController.getOrderActivity);
+router.get('/orders/:id/refunds', requireAdmin, adminController.getOrderRefunds);
+router.get('/orders/:id/transaction-state', requireAdmin, adminController.getOrderTransactionState);
+router.get('/orders/:id/notes', requireAdmin, adminController.listOrderNotes);
+router.post('/orders/:id/notes', requireAdmin, adminController.createOrderNote);
+router.patch('/orders/notes/:noteId', requireAdmin, adminController.updateOrderNote);
+router.delete('/orders/notes/:noteId', requireAdmin, adminController.deleteOrderNote);
+router.post('/orders/bulk-status', requireAdmin, adminController.bulkUpdateOrderStatus);
 
 // EPD Gateway — Payments Dashboard (Query API)
 router.get('/gateway/transactions', requireAdmin, adminController.getGatewayTransactions);

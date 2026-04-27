@@ -457,8 +457,13 @@ export class AdminController {
             const offset = parseInt(req.query.offset as string) || 0;
             const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
             const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+            const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+            const hideTestOrders = req.query.hideTestOrders === 'false' ? false : true; // default ON
+            const hasDiscountCode = req.query.hasDiscountCode === 'true';
 
-            const result = await adminService.listOrders({ status, limit, offset, startDate, endDate });
+            const result = await adminService.listOrders({
+                status, limit, offset, startDate, endDate, search, hideTestOrders, hasDiscountCode,
+            });
             res.json(result);
         } catch (error) {
             logger.error('Error fetching orders', { error });
@@ -1698,6 +1703,211 @@ export class AdminController {
         } catch (error) {
             logger.error('Error deleting EPD subscription', { error });
             res.status(500).json({ error: 'Failed to delete subscription' });
+        }
+    }
+
+    // ── Orders Management: extended actions ──
+
+    async cancelOrderNoRefund(req: Request, res: Response) {
+        try {
+            const { reason } = req.body || {};
+            if (!reason || typeof reason !== 'string') {
+                return res.status(400).json({ error: 'Reason is required' });
+            }
+            const result = await adminService.cancelOrderAsAdmin({ orderId: req.params.id, reason });
+            await logAdminAction(req, 'order_cancel_no_refund', 'order', req.params.id, { reason });
+            res.json(result);
+        } catch (error: any) {
+            if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
+            if (error?.message === 'ALREADY_CANCELLED') return res.status(409).json({ error: 'Order is already cancelled' });
+            if (error?.message === 'CANNOT_CANCEL_SHIPPED') return res.status(409).json({ error: 'Cannot cancel a shipped or delivered order' });
+            logger.error('Error cancelling order (admin no-refund)', { error });
+            res.status(500).json({ error: 'Failed to cancel order' });
+        }
+    }
+
+    async voidOrder(req: Request, res: Response) {
+        try {
+            const { reason } = req.body || {};
+            if (!reason || typeof reason !== 'string') {
+                return res.status(400).json({ error: 'Reason is required' });
+            }
+            const result = await adminService.voidOrderAsAdmin({ orderId: req.params.id, reason });
+            await logAdminAction(req, 'order_void', 'order', req.params.id, {
+                reason,
+                voidTransactionId: result.voidTransactionId,
+                refundId: result.refundId,
+            });
+            res.json(result);
+        } catch (error: any) {
+            if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
+            if (error?.message === 'NO_GATEWAY_TRANSACTION') return res.status(400).json({ error: 'No gateway transaction to void' });
+            if (error?.message === 'ALREADY_CANCELLED') return res.status(409).json({ error: 'Order is already cancelled' });
+            if (error?.message === 'CANNOT_VOID_SHIPPED') return res.status(409).json({ error: 'Cannot void a shipped or delivered order' });
+            if (typeof error?.message === 'string' && error.message.startsWith('VOID_REJECTED:')) {
+                return res.status(409).json({ error: error.message.replace('VOID_REJECTED: ', 'Void rejected: ') });
+            }
+            logger.error('Error voiding order', { error });
+            res.status(500).json({ error: 'Failed to void order' });
+        }
+    }
+
+    async resendOrderConfirmation(req: Request, res: Response) {
+        try {
+            const result = await adminService.resendOrderConfirmation(req.params.id);
+            if (!result.sent) return res.status(400).json({ error: result.reason || 'Failed to send' });
+            await logAdminAction(req, 'order_email_resent', 'order', req.params.id, { template: 'order_confirmation' });
+            res.json(result);
+        } catch (error) {
+            logger.error('Error resending order confirmation', { error });
+            res.status(500).json({ error: 'Failed to resend order confirmation' });
+        }
+    }
+
+    async resendShippingNotification(req: Request, res: Response) {
+        try {
+            const result = await adminService.resendShippingNotification(req.params.id);
+            if (!result.sent) return res.status(400).json({ error: result.reason || 'Failed to send' });
+            await logAdminAction(req, 'order_email_resent', 'order', req.params.id, { template: 'shipping_notification' });
+            res.json(result);
+        } catch (error) {
+            logger.error('Error resending shipping notification', { error });
+            res.status(500).json({ error: 'Failed to resend shipping notification' });
+        }
+    }
+
+    async setOrderTestFlag(req: Request, res: Response) {
+        try {
+            const { isTest } = req.body || {};
+            if (typeof isTest !== 'boolean') return res.status(400).json({ error: 'isTest (boolean) is required' });
+            const order = await adminService.setTestOrderFlag(req.params.id, isTest);
+            await logAdminAction(req, 'order_test_flag', 'order', req.params.id, { isTest });
+            res.json(order);
+        } catch (error: any) {
+            if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
+            logger.error('Error setting order test flag', { error });
+            res.status(500).json({ error: 'Failed to set test flag' });
+        }
+    }
+
+    async getOrderActivity(req: Request, res: Response) {
+        try {
+            const limit = parseInt(req.query.limit as string) || 50;
+            const offset = parseInt(req.query.offset as string) || 0;
+            const result = await adminService.getOrderActivity(req.params.id, { limit, offset });
+            res.json(result);
+        } catch (error) {
+            logger.error('Error fetching order activity', { error });
+            res.status(500).json({ error: 'Failed to fetch order activity' });
+        }
+    }
+
+    async getOrderRefunds(req: Request, res: Response) {
+        try {
+            const refunds = await adminService.getOrderRefunds(req.params.id);
+            res.json(refunds);
+        } catch (error) {
+            logger.error('Error fetching order refunds', { error });
+            res.status(500).json({ error: 'Failed to fetch order refunds' });
+        }
+    }
+
+    async getOrderTransactionState(req: Request, res: Response) {
+        try {
+            const state = await adminService.getEpdTransactionState(req.params.id);
+            await logAdminAction(req, 'order_internal_view', 'order', req.params.id, { feature: 'epd_state_query' });
+            res.json(state);
+        } catch (error: any) {
+            if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
+            if (error?.message === 'NO_GATEWAY_TRANSACTION') return res.status(400).json({ error: 'No gateway transaction to query' });
+            logger.error('Error fetching EPD transaction state', { error });
+            res.status(500).json({ error: 'Failed to fetch transaction state' });
+        }
+    }
+
+    async listOrderNotes(req: Request, res: Response) {
+        try {
+            const notes = await adminService.listOrderNotes(req.params.id);
+            res.json(notes);
+        } catch (error) {
+            logger.error('Error listing order notes', { error });
+            res.status(500).json({ error: 'Failed to list order notes' });
+        }
+    }
+
+    async createOrderNote(req: Request, res: Response) {
+        try {
+            const { body } = req.body || {};
+            if (!body || typeof body !== 'string') return res.status(400).json({ error: 'body is required' });
+            const adminId = (req as any).userId;
+            const note = await adminService.createOrderNote({ orderId: req.params.id, adminId, body });
+            await logAdminAction(req, 'order_note_add', 'order', req.params.id, { noteId: note.id });
+            res.status(201).json(note);
+        } catch (error: any) {
+            if (error?.message === 'BODY_REQUIRED') return res.status(400).json({ error: 'body cannot be empty' });
+            logger.error('Error creating order note', { error });
+            res.status(500).json({ error: 'Failed to create order note' });
+        }
+    }
+
+    async updateOrderNote(req: Request, res: Response) {
+        try {
+            const { body } = req.body || {};
+            if (!body || typeof body !== 'string') return res.status(400).json({ error: 'body is required' });
+            const adminId = (req as any).userId;
+            const note = await adminService.updateOrderNote(req.params.noteId, body, adminId);
+            res.json(note);
+        } catch (error: any) {
+            if (error?.message === 'NOTE_NOT_FOUND') return res.status(404).json({ error: 'Note not found' });
+            if (error?.message === 'NOT_OWNER') return res.status(403).json({ error: 'You can only edit notes you authored' });
+            if (error?.message === 'BODY_REQUIRED') return res.status(400).json({ error: 'body cannot be empty' });
+            logger.error('Error updating order note', { error });
+            res.status(500).json({ error: 'Failed to update order note' });
+        }
+    }
+
+    async deleteOrderNote(req: Request, res: Response) {
+        try {
+            const adminId = (req as any).userId;
+            await adminService.deleteOrderNote(req.params.noteId, adminId);
+            res.json({ success: true });
+        } catch (error: any) {
+            if (error?.message === 'NOTE_NOT_FOUND') return res.status(404).json({ error: 'Note not found' });
+            if (error?.message === 'NOT_OWNER') return res.status(403).json({ error: 'You can only delete notes you authored' });
+            logger.error('Error deleting order note', { error });
+            res.status(500).json({ error: 'Failed to delete order note' });
+        }
+    }
+
+    async updateOrderTrackingFields(req: Request, res: Response) {
+        try {
+            const { trackingNumber, carrier, trackingUrl } = req.body || {};
+            const order = await adminService.updateOrderTrackingFields(req.params.id, { trackingNumber, carrier, trackingUrl });
+            await logAdminAction(req, 'order_status_change', 'order', req.params.id, { trackingNumber, carrier, trackingUrl });
+            res.json(order);
+        } catch (error: any) {
+            if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
+            if (error?.message === 'INVALID_CARRIER') return res.status(400).json({ error: 'Carrier must be one of ups | fedex | dhl | usps' });
+            logger.error('Error updating order tracking fields', { error });
+            res.status(500).json({ error: 'Failed to update tracking' });
+        }
+    }
+
+    async bulkUpdateOrderStatus(req: Request, res: Response) {
+        try {
+            const { orderIds, status, trackingUrl } = req.body || {};
+            if (!Array.isArray(orderIds) || orderIds.length === 0) {
+                return res.status(400).json({ error: 'orderIds (non-empty array) is required' });
+            }
+            if (!status || typeof status !== 'string') return res.status(400).json({ error: 'status is required' });
+            const results = await adminService.bulkUpdateOrderStatus({ orderIds, status, trackingUrl });
+            for (const r of results) {
+                if (r.ok) await logAdminAction(req, 'order_status_change', 'order', r.orderId, { status, trackingUrl, viaBulk: true });
+            }
+            res.json({ results });
+        } catch (error) {
+            logger.error('Error bulk updating order status', { error });
+            res.status(500).json({ error: 'Failed to bulk update' });
         }
     }
 }
