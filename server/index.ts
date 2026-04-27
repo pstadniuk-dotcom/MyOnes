@@ -93,7 +93,7 @@ app.use(helmet({
         "https://www.ones.health",
         ...(!isDevMode ? [] : ["http://localhost:5000", "http://127.0.0.1:5000"]),
       ],
-      mediaSrc: ["'self'", "data:", "blob:", "https://*.supabase.co", "https://supabase.co"],
+      mediaSrc: ["'self'", "data:", "blob:", "https://ones.health", "https://www.ones.health", "https://*.supabase.co", "https://supabase.co"],
       connectSrc: ["'self'", "https://api.openai.com", "https://api.anthropic.com", "https://accounts.google.com/gsi/", "https://www.facebook.com", "https://web.facebook.com", "https://graph.facebook.com", "https://facebook.com","https://maps.googleapis.com",  "https://maps.gstatic.com", "https://places.googleapis.com", "https://secure.easypaydirectgateway.com", "https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://*.google-analytics.com", "https://*.analytics.google.com", "wss:", "ws:"],
       frameSrc: ["'self'", "blob:", "https://www.youtube.com", "https://youtube.com", "https://accounts.google.com/", "https://www.facebook.com", "https://web.facebook.com", "https://secure.easypaydirectgateway.com", "https://www.googletagmanager.com"],
       frameAncestors: ["'none'"],
