@@ -92,8 +92,8 @@ const supplementsTab: TabData = {
     { key: "adjustsAsHealthChanges", label: "Adjusts as Your Health Changes" },
     { key: "considersMedications", label: "Considers Your Medications" },
     { key: "ingredientOptions", label: "200+ Ingredient Options" },
-    { key: "notOneSizeFitsAll", label: "Not One-Size-Fits-All" },
-    { key: "notGenericDosing", label: "Not Generic Dosing" },
+    { key: "notOneSizeFitsAll", label: "Tailored to You" },
+    { key: "notGenericDosing", label: "Precision Dosing" },
   ],
 };
 
