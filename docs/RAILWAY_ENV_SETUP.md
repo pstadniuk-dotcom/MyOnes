@@ -1,5 +1,11 @@
 # Railway Environment Variables — ONES Production Setup
 
+> ## ⛔ DEPRECATED — DO NOT FOLLOW THIS DOC
+>
+> **We deploy on RENDER, not Railway.** Set environment variables in the
+> Render dashboard (Service → Environment). The variable names listed below
+> are still accurate, but the "where to add them" instructions are wrong.
+
 This document lists all environment variables that must be configured in the Railway dashboard for the ONES backend to function correctly in production.
 
 **Where to add them:**

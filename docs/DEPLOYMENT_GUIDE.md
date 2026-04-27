@@ -1,5 +1,15 @@
 # 🚀 ONES AI - Deployment Migration Guide
 
+> ## ⛔ DEPRECATED — DO NOT FOLLOW THIS DOC
+>
+> **Production hosting is RENDER**, not Supabase+Railway+Vercel. The
+> migration described below was never carried through to production.
+> Render auto-deploys `main` from GitHub; check the Render dashboard for
+> build/deploy status. Database is currently on Supabase Postgres but
+> the app doesn't care — it just uses `DATABASE_URL`.
+>
+> Kept only as historical reference. Do not use the Vercel/Railway sections.
+
 ## Current Status
 - ✅ **Database**: Neon (with all tables populated)
 - ⚠️ **Target**: Migrate to Supabase + Railway + Vercel

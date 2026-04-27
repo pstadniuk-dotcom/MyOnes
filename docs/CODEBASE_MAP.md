@@ -19,16 +19,10 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         FRONTEND                                │
-│  Vercel: https://my-ones.vercel.app                            │
-│  React + Vite + TailwindCSS + shadcn/ui                        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         BACKEND                                 │
-│  Railway: https://myones-production.up.railway.app             │
-│  Express.js + Node.js                                          │
+│                    FRONTEND + BACKEND                           │
+│  Render: Express server serves the built Vite client            │
+│  React + Vite + TailwindCSS + shadcn/ui  /  Express + Node.js   │
+│  Auto-deploys on push to `main` (GitHub integration)            │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -37,6 +31,10 @@
 │  Supabase (PostgreSQL) + Drizzle ORM                           │
 │  Production: postgres.aytzwtehxtvoejgcixdn (us-east-1)         │
 └─────────────────────────────────────────────────────────────────┘
+
+NOTE: We deploy on RENDER. Not Vercel. Not Railway.
+Ignore vercel.json / railway.json / Deploy Vercel / Deploy Railway —
+those are stale artifacts and not the source of truth.
 ```
 
 ---

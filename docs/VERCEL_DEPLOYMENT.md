@@ -1,5 +1,17 @@
 # Vercel Deployment Guide
 
+> ## ⛔ DEPRECATED — DO NOT FOLLOW THIS DOC
+>
+> **We deploy on RENDER. Not Vercel. Not Railway.**
+>
+> Render auto-deploys `main` from GitHub on every push. Frontend and backend
+> both run on Render (Express serves the built Vite client). Check the
+> **Render dashboard** for build/deploy status.
+>
+> This document is kept only as historical reference for an architecture that
+> was evaluated but never adopted. The Railway URL and Vercel CLI commands
+> below are stale.
+
 ## Railway Backend URL
 ✅ **Backend deployed at:** `https://myones-production.up.railway.app`
 

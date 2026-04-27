@@ -38,23 +38,28 @@ npm run db:push      # Push schema changes to database
 npm run test:db      # Test database connection and list tables
 ```
 
-### Deployment (Supabase + Railway + Vercel)
+### Deployment (Render — single source of truth)
+
+**We deploy to Render. Not Vercel. Not Railway.**
+
+- Frontend AND backend are deployed on Render
+- GitHub auto-deploys `main` on push — no CLI step required
+- Check **Render dashboard** for build/deploy status (NOT Vercel, NOT Railway)
+- Ignore any `vercel.json`, `railway.json`, `Deploy Vercel`, or `Deploy Railway` artifacts
+  in the repo — they are stale and not the source of truth
+- Do NOT add Vercel-specific config (`vercel.json` redirects, `_redirects` files, etc.)
+- Older docs (`docs/VERCEL_DEPLOYMENT.md`, `docs/DEPLOYMENT_GUIDE.md`) describe a
+  Supabase+Railway+Vercel stack that was never the production setup — historical only
+
 ```bash
-# Database Setup
-node setup-supabase.mjs           # Interactive Supabase configuration
-npm run db:push                   # Push schema to Supabase
-./migrate-to-supabase.sh          # Migrate data from Neon (optional)
-
-# Deployment Verification
-node check-deployment.mjs         # Check all config before deploy
-
-# See QUICKSTART.md and DEPLOYMENT_GUIDE.md for full instructions
+# Database Setup (Supabase Postgres is fine; the host doesn't matter to the app)
+npm run db:push                   # Push schema to whatever DATABASE_URL points at
+node check-deployment.mjs         # Pre-deploy config check
 ```
 
 **Deployment Architecture:**
-- **Frontend**: Vercel (React/Vite static site)
-- **Backend**: Railway (Express API server)
-- **Database**: Supabase (PostgreSQL with Drizzle ORM)
+- **Frontend + Backend**: Render (Express server serves the built Vite client)
+- **Database**: PostgreSQL (currently Supabase) via Drizzle ORM
 
 ### AI Model Configuration
 - Admin can configure AI provider/model at runtime via Admin Dashboard → AI Settings

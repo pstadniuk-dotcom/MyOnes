@@ -68,7 +68,7 @@ describe('API Configuration Validation', () => {
     });
 
     it('should detect custom domain as production', () => {
-      const hostname = 'my-ones.vercel.app';
+      const hostname = 'my-ones.onrender.com';
       const isProduction = !hostname.includes('localhost') && !hostname.includes('127.0.0.1');
       expect(isProduction).toBe(true);
     });

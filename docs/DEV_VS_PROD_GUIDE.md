@@ -1,5 +1,11 @@
 # Development vs Production Environment Guide
 
+> ## ⛔ DEPRECATED — DO NOT FOLLOW THIS DOC
+>
+> **Production hosting is RENDER**, not Vercel + Railway. Express on Render
+> serves the built Vite client. Local dev is still `npm run dev` on port 5000.
+> Kept only as historical reference.
+
 ## Your Current Setup ✅
 
 ### Development Environment (Local)

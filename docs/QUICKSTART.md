@@ -1,5 +1,11 @@
 # 🚀 Quick Start - Deploy ONES AI
 
+> ## ⛔ DEPRECATED — DO NOT FOLLOW THIS DOC
+>
+> **Production hosting is RENDER**, not Vercel/Railway. Render auto-deploys
+> `main` from GitHub on every push — no CLI step needed. Check the Render
+> dashboard for status. Database is Supabase Postgres via `DATABASE_URL`.
+
 ## Current Status
 ✅ **Code is ready** - All files in place, 28 database tables defined  
 ⚠️ **Database**: Currently using Neon (working), need to migrate to Supabase  

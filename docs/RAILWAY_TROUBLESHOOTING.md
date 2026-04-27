@@ -1,5 +1,11 @@
 # Railway Deployment Troubleshooting
 
+> ## ⛔ DEPRECATED — DO NOT FOLLOW THIS DOC
+>
+> **We deploy on RENDER, not Railway.** Railway was evaluated but is not
+> the production stack. Check the Render dashboard for build/deploy status
+> and logs. Kept only as historical reference.
+
 ## Current Issue
 Railway deployment showing 502 "Application failed to respond" error.
 

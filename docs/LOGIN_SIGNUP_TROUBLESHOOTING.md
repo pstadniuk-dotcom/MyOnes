@@ -1,5 +1,9 @@
 # Login/Signup Troubleshooting Guide
 
+> **Note:** Production runs on RENDER (not Vercel/Railway). Where this doc
+> says "Vercel URL" or "Railway backend," mentally substitute your Render
+> service URL. The diagnostic steps themselves are still valid.
+
 ## Overview
 This guide helps diagnose and fix issues with login and signup functionality in the ONES AI application, particularly in production deployments.
 

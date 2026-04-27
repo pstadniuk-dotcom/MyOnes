@@ -103,10 +103,9 @@ export function validateEnvPlugin(options: EnvValidationOptions = {}): Plugin {
         console.error(
           '\n💡 To fix these issues:\n' +
           '   1. Set the missing environment variables in your deployment platform\n' +
-          '   2. For Vercel: Project Settings → Environment Variables\n' +
-          '   3. For Railway: Project → Variables\n' +
-          '   4. Ensure all URLs include http:// or https://\n' +
-          '   5. Redeploy after updating variables\n'
+          '   2. For Render: Service → Environment\n' +
+          '   3. Ensure all URLs include http:// or https://\n' +
+          '   4. Redeploy after updating variables\n'
         );
 
         if (shouldFailOnError) {
