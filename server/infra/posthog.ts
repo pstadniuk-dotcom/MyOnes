@@ -4,11 +4,31 @@ import { users, orders, formulas, subscriptions, autoShipSubscriptions, fileUplo
 import { eq, and, sql } from 'drizzle-orm';
 import logger from './logging/logger';
 
-const posthog = new PostHog(process.env.POSTHOG_API_KEY!, {
-  host: process.env.POSTHOG_HOST,
-  flushAt: 20,
-  flushInterval: 10000,
-});
+// Tolerate a missing API key in dev/CI/preview environments — PostHog is
+// purely observational, it must never block server boot. When the key is
+// missing we install a no-op stub with the same shape the rest of the app
+// expects (capture, identify, shutdown).
+const POSTHOG_KEY = process.env.POSTHOG_API_KEY;
+
+type PostHogLike = Pick<PostHog, 'capture' | 'identify' | 'shutdown'>;
+
+const noopPostHog: PostHogLike = {
+  capture: () => {},
+  identify: () => {},
+  shutdown: async () => {},
+};
+
+const posthog: PostHogLike = POSTHOG_KEY
+  ? new PostHog(POSTHOG_KEY, {
+      host: process.env.POSTHOG_HOST,
+      flushAt: 20,
+      flushInterval: 10000,
+    })
+  : noopPostHog;
+
+if (!POSTHOG_KEY) {
+  logger.warn('[posthog] POSTHOG_API_KEY not set — analytics disabled (no-op stub installed)');
+}
 
 /**
  * Compute and attach a fresh snapshot of user properties to the next event for
