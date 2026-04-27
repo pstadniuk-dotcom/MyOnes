@@ -401,8 +401,9 @@ async function rescueCollectionDateFromText(rawText: string): Promise<{ date: st
 
 Rules:
 - Prefer labels: "Collection Date", "Specimen Collected", "Date Collected", "Date Drawn", "Draw Date", "Date of Service", "Collected:".
-- NEVER return a "Report Date", "Print Date", "Released Date", or "Received Date".
-- If multiple collection dates appear, return the EARLIEST.
+- NEVER return a "Report Date", "Print Date", "Released Date", "Received Date", or "Exported" date.
+- If multiple collection dates appear AS COMPARISON COLUMNS in a longitudinal report (newest-first is common — e.g. SiPhox, Function Health), return the MOST RECENT date. The patient wants their latest results, not their oldest.
+- If multiple collection dates appear because separate panels of a single testing event were drawn on different days, return the EARLIEST.
 - If you are not confident, return { "date": null, "source": "NOT FOUND", "confidence": "none" }.
 - Return ONLY JSON: { "date": "YYYY-MM-DD" | null, "source": "short description", "confidence": "high" | "medium" | "low" | "none" }.`;
 
@@ -446,8 +447,9 @@ export async function structureLabData(rawText: string): Promise<LabDataExtracti
 Extract the following top-level fields:
 - testDate: The **specimen collection date** (the date the blood/urine was actually drawn from the patient) in ISO format YYYY-MM-DD.
   * Look for labels such as: "Collection Date", "Specimen Collected", "Date Collected", "Date Drawn", "Draw Date", "Date of Service", "Accessioned", "Collected:".
-  * DO NOT use the "Report Date", "Print Date", "Released Date", "Received Date", or "Reviewed Date" — these can be days/weeks AFTER the actual draw and will make the data look more recent than it is.
-  * If the document shows multiple collection dates (multi-panel report), use the EARLIEST collection date.
+  * DO NOT use the "Report Date", "Print Date", "Released Date", "Received Date", "Reviewed Date", or "Exported" date — these can be days/weeks AFTER the actual draw and will make the data look more recent than it is.
+  * If the document is a LONGITUDINAL / COMPARISON report (multiple test dates shown side-by-side as separate result columns — common for SiPhox, Function Health, InsideTracker, Quest MyChart trending views), use the MOST RECENT collection date. The patient is uploading the report to see their LATEST numbers, not their oldest. SiPhox specifically lists newest-first on the LEFT.
+  * If the document is a single-draw multi-panel report where every panel was collected on different days but represents ONE testing event, use the EARLIEST collection date.
   * If you are NOT confident, return null — do NOT guess.
 - testDateSource: A short string describing where you found the date, e.g. "Collection Date field on page 1", "Specimen Collected label", or "NOT FOUND" if null.
 - testDateConfidence: "high" (explicit collection date label), "medium" (unlabeled date near patient info), or "low" / "none".
@@ -457,7 +459,8 @@ Extract the following top-level fields:
 - overallAssessment: A 2-3 sentence clinical summary of the report: how many markers are out of range, which are most concerning, and what the results suggest overall. Write for an informed consumer, not a doctor.
 - extractedData: Array of EVERY test result found, where each item has:
   - testName: Standardized name of the test (e.g., "LDL Cholesterol" not "LDL-C Direct")
-  - value: The numeric or text value exactly as shown
+  - value: The numeric or text value exactly as shown.
+    LONGITUDINAL REPORTS (multiple result columns): pull the value from the column matching the testDate you chose above (i.e. the MOST RECENT column). NEVER pull from an older comparison column. If you can see a "Feb 18, 2026" and "Jan 19, 2026" column, the testDate is Feb 18 and EVERY value must be the Feb 18 value, not the Jan 19 value.
   - unit: The unit of measurement (if present)
   - referenceRange: The normal reference range exactly as shown (e.g., "< 100 mg/dL", "30-100 ng/mL")
   - status: "high", "low", "critical", or "normal" based on the reference range. Use "critical" only for values far outside the range that need urgent attention.
