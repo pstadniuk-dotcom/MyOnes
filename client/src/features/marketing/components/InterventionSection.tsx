@@ -255,7 +255,9 @@ export default function InterventionSection() {
                     autoPlay
                     loop
                     muted
-                    playsInline                    preload="auto"                    className="relative w-full h-auto rounded-2xl shadow-xl"
+                    playsInline
+                    preload="auto"
+                    className="relative w-full h-auto rounded-2xl shadow-xl"
                   />
                 </div>
               </motion.div>
@@ -441,32 +443,47 @@ export function OnesDifferenceSection() {
   useEffect(() => {
     const v = mobileVideoRef.current;
     if (!v) return;
+
+    // Ensure muted is set early and explicitly to help bypass autoplay blocks
     v.muted = true;
+    v.defaultMuted = true;
+
     let cancelled = false;
-    const tryPlay = () => {
+
+    const tryPlay = async () => {
       if (cancelled || !v.paused) return;
-      const p = v.play();
-      if (p && typeof p.then === 'function') {
-        p.then(() => { if (!cancelled) setMobileVideoBlocked(false); })
-         .catch((err) => {
-           if (cancelled) return;
-           // AbortError just means another play() (often the autoPlay attribute) won the race.
-           // Don't show the blocked overlay for that — only for genuine NotAllowedError etc.
-           if (err && err.name === 'AbortError') return;
-           setMobileVideoBlocked(true);
-         });
+      try {
+        await v.play();
+        if (!cancelled) setMobileVideoBlocked(false);
+      } catch (err: any) {
+        if (cancelled) return;
+        // AbortError is common and safe to ignore (e.g. another play() call interrupted this one)
+        if (err && err.name === 'AbortError') return;
+        
+        console.warn("Mobile video autoplay blocked:", err);
+        setMobileVideoBlocked(true);
       }
     };
+
+    // If already ready, try playing immediately
     if (v.readyState >= 2) {
       tryPlay();
-    } else {
-      v.addEventListener('loadeddata', tryPlay, { once: true });
     }
-    const onVis = () => { if (!document.hidden && v.paused) tryPlay(); };
+
+    // Listen for all events that indicate the video is ready to attempt playback
+    const events = ['loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough'];
+    events.forEach(event => v.addEventListener(event, tryPlay));
+
+    const onVis = () => { 
+      if (!document.hidden && v.paused) {
+        tryPlay();
+      }
+    };
     document.addEventListener('visibilitychange', onVis);
+
     return () => {
       cancelled = true;
-      v.removeEventListener('loadeddata', tryPlay);
+      events.forEach(event => v.removeEventListener(event, tryPlay));
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
