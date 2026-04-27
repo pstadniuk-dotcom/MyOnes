@@ -489,8 +489,7 @@ export function OnesDifferenceSection() {
                     disableRemotePlayback
                     controls={false}
                     controlsList="nodownload nofullscreen noremoteplayback noplaybackrate"
-                    style={{ aspectRatio: '1 / 1' }}
-                    className="relative w-full h-auto rounded-2xl shadow-xl object-cover pointer-events-none select-none"
+                    className="relative w-full h-auto rounded-2xl shadow-xl"
                   >
                     <source src="/capsule-formation.mp4" type="video/mp4" />
                   </video>
