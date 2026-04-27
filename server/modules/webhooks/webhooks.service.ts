@@ -7,6 +7,7 @@ import { wearablesService } from '../wearables/wearables.service';
 import { sendRawSms } from '../../utils/smsService';
 import { reorderRepository } from '../reorder/reorder.repository';
 import { reorderService } from '../reorder/reorder.service';
+import posthog, { syncUserProperties } from '../../infra/posthog';
 
 export class WebhooksService {
     /**
@@ -388,6 +389,16 @@ export class WebhooksService {
 
         // Invalidate Health Pulse cache so dashboard picks up the new device immediately
         wearablesService.invalidatePulseCache(user.id);
+
+        posthog.capture({
+            distinctId: user.id,
+            event: 'wearable_connected',
+            properties: {
+                provider: data?.provider ?? 'unknown',
+                source: 'junction_webhook',
+            },
+        });
+        void syncUserProperties(user.id);
     }
 
     private async handleProviderDisconnected(event: any) {
@@ -395,6 +406,7 @@ export class WebhooksService {
         const user = await this.findUserByJunctionId(junctionUserId);
         if (!user) return;
 
+        const isError = event.event_type === 'provider.connection.error';
         logger.info('Provider disconnected or error', {
             userId: user.id,
             provider: data?.provider,
@@ -403,6 +415,16 @@ export class WebhooksService {
 
         // Invalidate Health Pulse cache so dashboard reflects disconnection
         wearablesService.invalidatePulseCache(user.id);
+
+        posthog.capture({
+            distinctId: user.id,
+            event: isError ? 'wearable_token_refresh_failed' : 'wearable_disconnected',
+            properties: {
+                provider: data?.provider ?? 'unknown',
+                error: data?.error ?? null,
+                source: 'junction_webhook',
+            },
+        });
     }
 
     private async findUserByJunctionId(junctionUserId: string) {

@@ -12,6 +12,7 @@ import { formulasRepository } from '../../modules/formulas/formulas.repository';
 import { SYSTEM_SUPPORTS, INDIVIDUAL_INGREDIENTS, ALL_INGREDIENTS, SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
 import { epdQueryService } from '../../modules/billing/epd-query.service';
 import { epdGateway } from '../../modules/billing/epd-gateway';
+import posthog from '../../infra/posthog';
 
 export class AdminController {
     async getStats(req: Request, res: Response) {
@@ -1716,6 +1717,16 @@ export class AdminController {
             }
             const result = await adminService.cancelOrderAsAdmin({ orderId: req.params.id, reason });
             await logAdminAction(req, 'order_cancel_no_refund', 'order', req.params.id, { reason });
+            posthog.capture({
+                distinctId: (req as any).userId,
+                event: 'order_cancelled',
+                properties: {
+                    order_id: req.params.id,
+                    reason,
+                    refunded: false,
+                    actor: 'admin',
+                },
+            });
             res.json(result);
         } catch (error: any) {
             if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
@@ -1737,6 +1748,17 @@ export class AdminController {
                 reason,
                 voidTransactionId: result.voidTransactionId,
                 refundId: result.refundId,
+            });
+            posthog.capture({
+                distinctId: (req as any).userId,
+                event: 'order_voided',
+                properties: {
+                    order_id: req.params.id,
+                    reason,
+                    void_transaction_id: result.voidTransactionId,
+                    refund_id: result.refundId,
+                    actor: 'admin',
+                },
             });
             res.json(result);
         } catch (error: any) {
@@ -1782,6 +1804,16 @@ export class AdminController {
             if (typeof isTest !== 'boolean') return res.status(400).json({ error: 'isTest (boolean) is required' });
             const order = await adminService.setTestOrderFlag(req.params.id, isTest);
             await logAdminAction(req, 'order_test_flag', 'order', req.params.id, { isTest });
+            posthog.capture({
+                distinctId: (req as any).userId,
+                event: 'order_marked_test',
+                properties: {
+                    order_id: req.params.id,
+                    customer_user_id: order?.userId ?? null,
+                    is_test: isTest,
+                    actor: 'admin',
+                },
+            });
             res.json(order);
         } catch (error: any) {
             if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Order not found' });
@@ -1842,6 +1874,16 @@ export class AdminController {
             const adminId = (req as any).userId;
             const note = await adminService.createOrderNote({ orderId: req.params.id, adminId, body });
             await logAdminAction(req, 'order_note_add', 'order', req.params.id, { noteId: note.id });
+            posthog.capture({
+                distinctId: adminId,
+                event: 'order_note_added',
+                properties: {
+                    order_id: req.params.id,
+                    note_id: note.id,
+                    body_length: body.length,
+                    actor: 'admin',
+                },
+            });
             res.status(201).json(note);
         } catch (error: any) {
             if (error?.message === 'BODY_REQUIRED') return res.status(400).json({ error: 'body cannot be empty' });

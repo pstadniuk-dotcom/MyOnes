@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { wearablesService } from '../../modules/wearables/wearables.service';
 import logger from '../../infra/logging/logger';
+import posthog, { syncUserProperties } from '../../infra/posthog';
 
 export class WearablesController {
     private getFrontendBaseUrl = (req: Request): string => {
@@ -46,6 +47,11 @@ export class WearablesController {
             const frontendBaseUrl = this.getFrontendBaseUrl(req);
             const redirectUrl = `${frontendBaseUrl}/dashboard/wearables?connected=1`;
             const linkData = await wearablesService.getConnectLink(userId, provider, forceFreshUser, redirectUrl);
+            posthog.capture({
+                distinctId: userId,
+                event: 'wearable_connect_started',
+                properties: { provider: provider ?? null },
+            });
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
@@ -72,6 +78,14 @@ export class WearablesController {
             const userId = req.userId!;
             const { connectionId } = req.params;
             await wearablesService.disconnectDevice(userId, connectionId);
+
+            posthog.capture({
+                distinctId: userId,
+                event: 'wearable_disconnected',
+                properties: { connection_id: connectionId, source: 'user_initiated' },
+            });
+            void syncUserProperties(userId);
+
             res.json({ success: true });
         } catch (error: any) {
             logger.error('Error disconnecting wearable:', error);
