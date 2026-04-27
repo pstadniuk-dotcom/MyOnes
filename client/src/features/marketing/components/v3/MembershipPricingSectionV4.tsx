@@ -1,9 +1,17 @@
 import { Link } from "wouter";
 import { Button } from "@/shared/components/ui/button";
-import { Check, ArrowRight, Loader2, Scale, Layers, ShieldCheck, Package, Beaker } from "lucide-react";
+import { Check, ArrowRight, Loader2, Scale, Layers, ShieldCheck, Package, Beaker, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAuthHeaders } from "@/shared/lib/queryClient";
+import { buildApiUrl } from "@/shared/lib/api";
 import { useRef, useState, useEffect, useCallback } from "react";
+
+interface MyMembershipPayload {
+  hasMembership: boolean;
+  isCancelled?: boolean;
+  tier?: string;
+}
 
 interface MembershipTier {
   id: string;
@@ -54,11 +62,38 @@ function findActiveTier(tiers: ReturnType<typeof transformTiers>) {
 
 export default function MembershipPricingSectionV4() {
   const { user } = useAuth();
-  // Don't push membership purchase from the home page — funnel everyone into
-  // account creation / dashboard first. Membership selection happens later in
-  // the onboarding/consultation flow once they've actually engaged.
-  const ctaHref = user ? '/dashboard' : '/signup';
-  const ctaLabel = user ? 'Go to Your Dashboard' : 'Create Your Free Account';
+
+  // Check if the logged-in user already has an active membership so we can
+  // swap the CTA into a "You're a member" confirmation instead of pushing
+  // them back through signup/checkout.
+  const { data: myMembership } = useQuery<MyMembershipPayload>({
+    queryKey: ["/api/membership/me"],
+    enabled: !!user,
+    queryFn: async () => {
+      const res = await fetch(buildApiUrl("/api/membership/me"), {
+        method: "GET",
+        headers: { ...getAuthHeaders() },
+        credentials: "include",
+      });
+      if (res.status === 404) return { hasMembership: false };
+      if (!res.ok) throw new Error("Failed to load membership");
+      return res.json();
+    },
+  });
+
+  const hasActiveMembership =
+    !!myMembership?.hasMembership && !myMembership?.isCancelled;
+
+  // CTA logic:
+  //  - Guests → push to signup (account first, never direct membership purchase)
+  //  - Logged-in, no active membership → push to dashboard (let them engage there)
+  //  - Logged-in active member → show a "You're a member" confirmation linking to dashboard
+  const ctaHref = !user ? '/signup' : '/dashboard';
+  const ctaLabel = !user
+    ? 'Create Your Free Account'
+    : hasActiveMembership
+      ? "You're a Member — Go to Dashboard"
+      : 'Go to Your Dashboard';
   const sectionRef = useRef<HTMLElement>(null);
   const [revealed, setRevealed] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -223,13 +258,20 @@ export default function MembershipPricingSectionV4() {
               <Link href={ctaHref}>
                 <Button className="relative w-full bg-[#054700] hover:bg-[#053600] text-white py-6 text-lg rounded-full font-medium group overflow-hidden btn-shimmer shadow-lg shadow-[#054700]/20 hover:shadow-xl hover:shadow-[#054700]/25 transition-all duration-300">
                   <span className="relative z-[2] flex items-center justify-center">
+                    {hasActiveMembership && (
+                      <Sparkles className="mr-2 w-5 h-5" />
+                    )}
                     {ctaLabel}
-                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    {!hasActiveMembership && (
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    )}
                   </span>
                 </Button>
               </Link>
               <p className="text-center text-[#054700]/25 text-xs mt-3 font-light">
-                No credit card required &middot; Pick your plan after signup
+                {hasActiveMembership
+                  ? `Active ${myMembership?.tier ?? ''} member \u00b7 Rate locked for life`.trim()
+                  : 'No credit card required \u00b7 Pick your plan after signup'}
               </p>
             </div>
           </div>
