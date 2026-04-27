@@ -134,8 +134,8 @@ export default function HeroSectionV2() {
           <h1 className="text-[2rem] sm:text-5xl md:text-6xl lg:text-[56px] xl:text-[60px] leading-[1.24] tracking-[-0.02em]">
             <span className="block font-light text-[#054700]">One formula.</span>
             <span className="block font-light text-[#054700] min-h-[1.25em]">Built from{" "}
-              <span className="relative inline-grid min-w-[10ch] sm:min-w-[14ch] align-baseline leading-[1.2] text-center lg:text-left">
-                <span className="invisible col-start-1 row-start-1">your wearables</span>
+              <span className="relative inline-grid lg:min-w-[14ch] align-baseline leading-[1.2] text-center lg:text-left">
+                <span className="invisible col-start-1 row-start-1 hidden lg:inline">your wearables</span>
                 <span className="text-gradient-green font-light col-start-1 row-start-1">{typewriterText}</span>
               </span>
             </span>
