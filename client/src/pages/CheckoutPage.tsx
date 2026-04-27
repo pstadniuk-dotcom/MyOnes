@@ -178,6 +178,18 @@ export default function CheckoutPage() {
 
   // ── Checkout Options ───────────────────────────────────────────────
 
+  const [discountCodeInput, setDiscountCodeInput] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    type: "percent" | "fixed_cents" | "free_shipping";
+    discountCents: number;
+    freeShipping: boolean;
+    dropMemberDiscount: boolean;
+    description: string | null;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [validatingDiscount, setValidatingDiscount] = useState(false);
+
   const [includeMembership, setIncludeMembership] = useState(
     membershipParam === "1",
   );
@@ -314,9 +326,16 @@ export default function CheckoutPage() {
   const membershipMonthlyPrice = membershipTier
     ? membershipTier.priceCents / 100
     : 0;
-  const membershipSavings = formulaPrice * 0.15;
+  // Member discount only applies if the code didn't beat it (dropMemberDiscount === true)
+  const memberDiscountActive =
+    !appliedDiscount?.dropMemberDiscount;
+  const membershipSavings = memberDiscountActive ? formulaPrice * 0.15 : 0;
   const discountedPrice = Math.max(0, formulaPrice - membershipSavings);
-  const shippingCost = quoteData?.quote?.shipping ?? 0;
+  const codeDiscountAmount = appliedDiscount
+    ? appliedDiscount.discountCents / 100
+    : 0;
+  const baseShippingCost = quoteData?.quote?.shipping ?? 0;
+  const shippingCost = appliedDiscount?.freeShipping ? 0 : baseShippingCost;
 
   const activeMembershipPrice = myMembership?.priceCents
     ? myMembership.priceCents / 100
@@ -326,14 +345,17 @@ export default function CheckoutPage() {
     : membershipMonthlyPrice;
 
   const orderTotal = (() => {
+    let formulaLine: number;
     if (includeMembership && membershipUpsellAvailable) {
-      return discountedPrice + membershipMonthlyPrice + shippingCost;
+      formulaLine = Math.max(0, discountedPrice - codeDiscountAmount);
+      return formulaLine + membershipMonthlyPrice + shippingCost;
     }
     if (hasActiveMembership) {
-      // Existing member: they get the discount but don't pay the membership fee again here
-      return discountedPrice + shippingCost;
+      formulaLine = Math.max(0, discountedPrice - codeDiscountAmount);
+      return formulaLine + shippingCost;
     }
-    return formulaPrice + shippingCost;
+    formulaLine = Math.max(0, formulaPrice - codeDiscountAmount);
+    return formulaLine + shippingCost;
   })();
 
   const showDiscounted =
@@ -489,6 +511,51 @@ export default function CheckoutPage() {
     };
   }, [clearPaymentTimeout]);
 
+  // ── Discount Code Apply/Remove ─────────────────────────────────────
+
+  const applyDiscountCode = useCallback(async () => {
+    const code = discountCodeInput.trim();
+    if (!code || !formulaId) return;
+    setValidatingDiscount(true);
+    setDiscountError(null);
+    try {
+      const res = await apiRequest("POST", "/api/discount-codes/validate", {
+        code,
+        formulaId,
+      });
+      const data = await res.json();
+      if (!data?.valid) {
+        setDiscountError(data?.error || "Invalid discount code");
+        setAppliedDiscount(null);
+        return;
+      }
+      setAppliedDiscount({
+        code: data.code,
+        type: data.type,
+        discountCents: data.discountCents,
+        freeShipping: data.freeShipping,
+        dropMemberDiscount: data.dropMemberDiscount,
+        description: data.description ?? null,
+      });
+    } catch (err: any) {
+      let message = "Could not validate that discount code.";
+      try {
+        const errBody = err?.response ? await err.response.json() : null;
+        if (errBody?.error) message = errBody.error;
+      } catch {}
+      setDiscountError(message);
+      setAppliedDiscount(null);
+    } finally {
+      setValidatingDiscount(false);
+    }
+  }, [discountCodeInput, formulaId]);
+
+  const removeDiscountCode = useCallback(() => {
+    setAppliedDiscount(null);
+    setDiscountCodeInput("");
+    setDiscountError(null);
+  }, []);
+
   // ── Checkout Mutation ──────────────────────────────────────────────
 
   const checkoutMutation = useMutation({
@@ -501,6 +568,7 @@ export default function CheckoutPage() {
           : false,
         enableAutoShip,
         plan: "monthly",
+        discountCode: appliedDiscount?.code,
         shippingAddress: {
           firstName,
           lastName,
@@ -721,6 +789,7 @@ export default function CheckoutPage() {
                   formulaPrice={formulaPrice}
                   discountedPrice={discountedPrice}
                   shippingCost={shippingCost}
+                  baseShippingCost={baseShippingCost}
                   membershipMonthlyPrice={membershipMonthlyPrice}
                   membershipSavings={membershipSavings}
                   membershipUpsellAvailable={membershipUpsellAvailable}
@@ -733,6 +802,13 @@ export default function CheckoutPage() {
                   showDiscounted={showDiscounted}
                   tierName={membershipTier?.name || myMembership?.tier}
                   displayMembershipPrice={displayMembershipPrice}
+                  discountCodeInput={discountCodeInput}
+                  onDiscountCodeInputChange={setDiscountCodeInput}
+                  appliedDiscount={appliedDiscount}
+                  discountError={discountError}
+                  validatingDiscount={validatingDiscount}
+                  onApplyDiscount={applyDiscountCode}
+                  onRemoveDiscount={removeDiscountCode}
                 />
                 <CheckoutReviews />
               </div>
@@ -1277,6 +1353,7 @@ function OrderSummaryCard({
   formulaPrice,
   discountedPrice,
   shippingCost,
+  baseShippingCost,
   membershipMonthlyPrice,
   membershipSavings,
   membershipUpsellAvailable,
@@ -1289,12 +1366,20 @@ function OrderSummaryCard({
   showDiscounted,
   tierName,
   displayMembershipPrice,
+  discountCodeInput,
+  onDiscountCodeInputChange,
+  appliedDiscount,
+  discountError,
+  validatingDiscount,
+  onApplyDiscount,
+  onRemoveDiscount,
 }: {
   formulaName: string;
   quote?: FormulaQuotePayload["quote"];
   formulaPrice: number;
   discountedPrice: number;
   shippingCost: number;
+  baseShippingCost: number;
   membershipMonthlyPrice: number;
   membershipSavings: number;
   membershipUpsellAvailable: boolean;
@@ -1307,6 +1392,20 @@ function OrderSummaryCard({
   showDiscounted: boolean;
   tierName?: string;
   displayMembershipPrice: number;
+  discountCodeInput: string;
+  onDiscountCodeInputChange: (v: string) => void;
+  appliedDiscount: {
+    code: string;
+    type: "percent" | "fixed_cents" | "free_shipping";
+    discountCents: number;
+    freeShipping: boolean;
+    dropMemberDiscount: boolean;
+    description: string | null;
+  } | null;
+  discountError: string | null;
+  validatingDiscount: boolean;
+  onApplyDiscount: () => void;
+  onRemoveDiscount: () => void;
 }) {
   return (
     <div className="rounded-2xl bg-white p-6 sm:p-8 shadow-sm border border-black/[0.04] space-y-6">
@@ -1387,10 +1486,88 @@ function OrderSummaryCard({
 
         <div className="flex justify-between">
           <span className="text-[#262626]/60">Shipping</span>
-          <span className="font-medium text-[#262626]">
-            {shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Free"}
-          </span>
+          {appliedDiscount?.freeShipping && baseShippingCost > 0 ? (
+            <span className="flex items-center gap-2">
+              <span className="line-through text-[#262626]/30">
+                ${baseShippingCost.toFixed(2)}
+              </span>
+              <span className="font-medium text-[#054700]">Free</span>
+            </span>
+          ) : (
+            <span className="font-medium text-[#262626]">
+              {shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Free"}
+            </span>
+          )}
         </div>
+
+        {appliedDiscount && appliedDiscount.discountCents > 0 && (
+          <div className="flex justify-between text-[#054700]">
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              Code {appliedDiscount.code}
+            </span>
+            <span>−${(appliedDiscount.discountCents / 100).toFixed(2)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Discount code input */}
+      <div className="rounded-xl border border-black/[0.06] p-4 space-y-2">
+        {appliedDiscount ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Check className="w-4 h-4 text-[#054700] flex-shrink-0" />
+              <span className="font-medium text-sm text-[#054700] truncate">
+                {appliedDiscount.code} applied
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onRemoveDiscount}
+              className="text-xs text-[#262626]/50 hover:text-[#262626] underline"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <>
+            <Label
+              htmlFor="discount-code"
+              className="text-xs text-[#262626]/60 font-medium"
+            >
+              Discount code
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="discount-code"
+                type="text"
+                value={discountCodeInput}
+                onChange={(e) =>
+                  onDiscountCodeInputChange(e.target.value.toUpperCase())
+                }
+                placeholder="ENTER CODE"
+                disabled={validatingDiscount}
+                className="flex-1 bg-white border-black/10 focus:border-[#054700] focus:ring-[#054700]/20 uppercase"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onApplyDiscount}
+                disabled={!discountCodeInput.trim() || validatingDiscount}
+                className="border-[#054700]/30 text-[#054700] hover:bg-[#054700]/[0.04]"
+              >
+                {validatingDiscount ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Apply"
+                )}
+              </Button>
+            </div>
+            {discountError && (
+              <p className="text-xs text-red-600">{discountError}</p>
+            )}
+          </>
+        )}
       </div>
 
       <Separator className="bg-black/[0.06]" />

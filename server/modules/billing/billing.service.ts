@@ -22,6 +22,7 @@ import { ingredientPricing, users, refunds } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../../infra/logging/logger';
 import { epdGateway, isApproved, type EpdTransactionResponse } from './epd-gateway';
+import { discountCodesService } from '../discount-codes/discount-codes.service';
 import { sendNotificationEmail } from '../../utils/emailService';
 import { sendAdminOrderNotification } from '../../utils/emailService';
 import { getFrontendUrl } from '../../utils/urlHelper';
@@ -81,6 +82,7 @@ export interface CheckoutPayload {
     zip: string;
     country?: string;
   };
+  discountCode?: string;
 }
 
 export interface CheckoutResult {
@@ -243,11 +245,49 @@ class DatabaseBillingProvider implements BillingProvider {
       if (!availableTier) throw new Error('NO_MEMBERSHIP_TIER_AVAILABLE');
     }
 
+    // ── Discount code: validate + reserve before computing totals ──
+    // Reservation atomically increments usedCount, so total max-uses can't be oversold.
+    // The reservation is released on any failure path before the EPD sale completes.
+    const wouldBeMember = !!(formula && (includeMembership || isActuallyActiveMember));
+    let discountReservation: {
+      redemptionId: string;
+      discountCodeId: string;
+      discountCents: number;
+      freeShipping: boolean;
+      dropMemberDiscount: boolean;
+    } | null = null;
+    if (payload.discountCode && formula) {
+      const reserved = await discountCodesService.reserveForCheckout({
+        code: payload.discountCode,
+        userId,
+        formulaCents: formulaAmountCents,
+        isMember: wouldBeMember,
+      });
+      if (!reserved.ok) throw new Error(`DISCOUNT_CODE_${reserved.error}`);
+      discountReservation = {
+        redemptionId: reserved.applied.redemptionId,
+        discountCodeId: reserved.applied.discountCodeId,
+        discountCents: reserved.applied.discountCents,
+        freeShipping: reserved.applied.freeShipping,
+        dropMemberDiscount: reserved.applied.dropMemberDiscount,
+      };
+    }
+
+    const releaseDiscountIfReserved = async () => {
+      if (discountReservation) {
+        await discountCodesService.release(discountReservation.redemptionId).catch(() => {});
+        discountReservation = null;
+      }
+    };
+
     // ── Calculate totals ──
-    const applyMemberDiscount = !!(formula && (includeMembership || isActuallyActiveMember));
+    const applyMemberDiscount = wouldBeMember && !(discountReservation?.dropMemberDiscount);
     const formulaLineAmountCents = applyMemberDiscount
       ? Math.round(formulaAmountCents * 0.85)
       : formulaAmountCents;
+    const codeDiscountCents = discountReservation?.discountCents ?? 0;
+    const adjustedFormulaCents = Math.max(0, formulaLineAmountCents - codeDiscountCents);
+    const adjustedShippingCents = discountReservation?.freeShipping ? 0 : shippingAmountCents;
 
     // IMPORTANT: Only charge membership price if the user is explicitly joining/renewing
     // in this transaction (indicated by availableTier being set).
@@ -255,21 +295,25 @@ class DatabaseBillingProvider implements BillingProvider {
     const tierPriceCents = availableTier ? Number((availableTier as any).priceCents) : 0;
     if (availableTier && (!Number.isFinite(tierPriceCents) || tierPriceCents < 0)) {
       logger.error('Invalid membership tier priceCents', { userId, tierKey: (availableTier as any).tierKey, priceCents: (availableTier as any).priceCents });
+      await releaseDiscountIfReserved();
       throw new Error('CHECKOUT_TOTAL_INVALID');
     }
     const membershipAmountCents = availableTier
       ? Math.round(tierPriceCents) * intervalCount
       : 0;
-      
-    const totalCents = formulaLineAmountCents + membershipAmountCents + shippingAmountCents;
+
+    const totalCents = adjustedFormulaCents + membershipAmountCents + adjustedShippingCents;
     if (!Number.isFinite(totalCents) || totalCents <= 0) {
       logger.error('Invalid checkout totalCents computed', {
         userId,
         formulaLineAmountCents,
+        codeDiscountCents,
+        adjustedFormulaCents,
         membershipAmountCents,
-        shippingAmountCents,
+        adjustedShippingCents,
         totalCents,
       });
+      await releaseDiscountIfReserved();
       throw new Error('CHECKOUT_TOTAL_INVALID');
     }
     const totalDollars = (totalCents / 100).toFixed(2);
@@ -280,10 +324,13 @@ class DatabaseBillingProvider implements BillingProvider {
       formulaAmountCents,
       applyMemberDiscount,
       formulaLineAmountCents,
+      codeDiscountCents,
+      adjustedFormulaCents,
       membershipAmountCents,
-      shippingAmountCents,
+      adjustedShippingCents,
       totalCents,
-      totalDollars
+      totalDollars,
+      discountCode: payload.discountCode || undefined,
     });
 
     // ── Build order description ──
@@ -329,6 +376,7 @@ class DatabaseBillingProvider implements BillingProvider {
       });
     } catch (err) {
       logger.error('EPD sale request failed', { userId, error: err });
+      await releaseDiscountIfReserved();
       throw new Error('PAYMENT_PROCESSING_ERROR');
     }
 
@@ -339,6 +387,7 @@ class DatabaseBillingProvider implements BillingProvider {
         responsetext: epdResult.responsetext,
         response_code: epdResult.response_code,
       });
+      await releaseDiscountIfReserved();
       throw new Error(`PAYMENT_DECLINED: ${epdResult.responsetext}`);
     }
 
@@ -425,6 +474,10 @@ class DatabaseBillingProvider implements BillingProvider {
           consentSnapshot,
           currency: 'USD',
           paymentMode: 'card',
+          discountCodeId: discountReservation?.discountCodeId ?? null,
+          discountAppliedCents: discountReservation
+            ? discountReservation.discountCents + (discountReservation.freeShipping ? shippingAmountCents : 0)
+            : 0,
         });
       } catch (persistErr) {
         logger.error('Failed to persist order after successful payment', {
@@ -443,6 +496,12 @@ class DatabaseBillingProvider implements BillingProvider {
         chargedCents: totalCents, mfrCostCents: manufacturerCostCents,
         quoteId: manufacturerQuoteId, transactionId,
       });
+
+      if (discountReservation) {
+        await discountCodesService.attachOrder(discountReservation.redemptionId, order.id).catch((err) => {
+          logger.warn('Failed to attach discount redemption to order', { err, orderId, redemptionId: discountReservation!.redemptionId });
+        });
+      }
 
       await usersRepository.updateUser(userId, { lastOrderDate: new Date() });
 

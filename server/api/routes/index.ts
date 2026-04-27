@@ -17,6 +17,7 @@ export { default as webhooksRoutes } from './webhooks.routes';
 export { default as optimizeRoutes } from './optimize.routes';
 export { default as membershipRoutes } from './membership.routes';
 export { default as billingRoutes } from './billing.routes';
+export { default as discountCodesRoutes } from './discount-codes.routes';
 export { default as reorderRoutes } from './reorder.routes';
 export { default as labsRoutes } from './labs.routes';
 export { default as blogRoutes } from './blog.routes';

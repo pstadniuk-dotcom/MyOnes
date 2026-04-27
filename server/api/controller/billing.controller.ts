@@ -22,6 +22,7 @@ const checkoutPayloadSchema = z.object({
   enableAutoShip: z.boolean().optional(),
   shippingAddress: addressSchema.optional(),
   billingAddress: addressSchema.optional(),
+  discountCode: z.string().trim().min(1).max(64).optional(),
 });
 
 export class BillingController {
@@ -134,6 +135,19 @@ export class BillingController {
       }
       if (error?.message === 'ORDER_PERSIST_FAILED') {
         return res.status(500).json({ error: 'Payment processed but order creation failed. Support has been notified.' });
+      }
+      if (typeof error?.message === 'string' && error.message.startsWith('DISCOUNT_CODE_')) {
+        const code = error.message.replace('DISCOUNT_CODE_', '');
+        const messages: Record<string, string> = {
+          NOT_FOUND: 'That discount code does not exist.',
+          INACTIVE: 'That discount code is no longer active.',
+          EXPIRED: 'That discount code has expired.',
+          EXHAUSTED: 'That discount code has reached its usage limit.',
+          USER_LIMIT: 'You have already used this discount code.',
+          MIN_ORDER: 'Your order does not meet the minimum amount for this discount code.',
+          FIRST_ORDER_ONLY: 'This discount code is only valid on your first order.',
+        };
+        return res.status(400).json({ error: messages[code] ?? 'Invalid discount code.', code: `DISCOUNT_CODE_${code}` });
       }
 
       const errMessage = typeof error?.message === 'string' ? error.message : undefined;

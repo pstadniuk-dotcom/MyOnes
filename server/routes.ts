@@ -21,6 +21,7 @@ import {
   dashboardRoutes,
   systemRoutes,
   billingRoutes,
+  discountCodesRoutes,
   reorderRoutes,
   labsRoutes,
   blogRoutes,
@@ -101,6 +102,7 @@ export async function registerRoutes(app: Express, rateLimiters?: { authLimiter?
   app.use('/api/optimize', optimizeRoutes);
   app.use('/api/membership', membershipRoutes);
   app.use('/api/billing', billingRoutes);
+  app.use('/api/discount-codes', discountCodesRoutes);
   app.use('/api/reorder', reorderRoutes);
   app.use('/api/labs', labsRoutes);
   app.use('/api/blog', blogRoutes);

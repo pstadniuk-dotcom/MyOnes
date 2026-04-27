@@ -465,6 +465,9 @@ export const orders = pgTable("orders", {
     country?: string;
   }>(),
 
+  discountCodeId: varchar("discount_code_id").references((): any => discountCodes.id, { onDelete: "set null" }),
+  discountAppliedCents: integer("discount_applied_cents").default(0).notNull(),
+
   // ── Order-level consent & safety snapshot (legal non-repudiation) ──
   consentSnapshot: json("consent_snapshot").$type<{
     /** Which consent types were active at time of purchase */
@@ -1119,6 +1122,57 @@ export const marketingCampaigns = pgTable("marketing_campaigns", {
 export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns);
 export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
 export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+
+// Discount Codes — promo/coupon codes redeemable at checkout
+export const discountCodeTypeEnum = pgEnum('discount_code_type', ['percent', 'fixed_cents', 'free_shipping']);
+
+export const discountCodes = pgTable("discount_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // stored uppercased, e.g. "WELCOME20"
+  description: text("description"), // admin-only label
+  type: discountCodeTypeEnum("type").notNull(),
+  value: integer("value").notNull(), // percent (1-100), cents off, or 0 for free_shipping
+  // Limits
+  maxUses: integer("max_uses"), // null = unlimited
+  usedCount: integer("used_count").default(0).notNull(),
+  maxUsesPerUser: integer("max_uses_per_user").default(1).notNull(),
+  minOrderCents: integer("min_order_cents").default(0).notNull(),
+  firstOrderOnly: boolean("first_order_only").default(false).notNull(),
+  // Stacking with the 15% member discount
+  stackableWithMember: boolean("stackable_with_member").default(false).notNull(),
+  // Lifecycle
+  expiresAt: timestamp("expires_at"), // null = never expires
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("discount_codes_code_idx").on(table.code),
+  index("discount_codes_active_idx").on(table.isActive),
+]);
+
+export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
+  id: true,
+  usedCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
+export type DiscountCode = typeof discountCodes.$inferSelect;
+
+export const discountCodeRedemptions = pgTable("discount_code_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  discountCodeId: varchar("discount_code_id").notNull().references(() => discountCodes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orderId: varchar("order_id").references(() => orders.id, { onDelete: "set null" }), // null until charge succeeds
+  amountAppliedCents: integer("amount_applied_cents").notNull(),
+  redeemedAt: timestamp("redeemed_at").defaultNow().notNull(),
+}, (table) => [
+  index("redemptions_user_code_idx").on(table.userId, table.discountCodeId),
+  index("redemptions_order_idx").on(table.orderId),
+]);
+
+export type DiscountCodeRedemption = typeof discountCodeRedemptions.$inferSelect;
 
 // Influencer Management
 export const influencers = pgTable("influencers", {

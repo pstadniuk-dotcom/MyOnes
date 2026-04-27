@@ -73,6 +73,7 @@ const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
 
 const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
 const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
+const DiscountCodesAdminPage = lazy(() => import("@/pages/admin/DiscountCodesAdminPage"));
 const SocialPostsPage = lazy(() => import("@/pages/admin/SocialPostsPage"));
 const UgcStudioPage = lazy(() => import("@/pages/admin/UgcStudioPage"));
 const MetaAdsPage = lazy(() => import("@/pages/admin/MetaAdsPage"));
@@ -389,6 +390,14 @@ function MainRouter() {
         <ProtectedAdminRoute>
           <AdminLayout>
             <Suspense fallback={<PageLoader />}><InfluencerHubPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+
+      <Route path="/admin/discount-codes">
+        <ProtectedAdminRoute>
+          <AdminLayout>
+            <Suspense fallback={<PageLoader />}><DiscountCodesAdminPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>
