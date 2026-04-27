@@ -10,8 +10,16 @@ const ALIVE_API_KEY = process.env.ALIVE_API_KEY || "";
 const ALIVE_API_ORIGIN = process.env.ALIVE_API_ORIGIN || "https://myones.onrender.com";
 
 // ── Production safety: warn if Alive API is pointing at dev URL in production ──
-if (process.env.NODE_ENV === 'production' && ALIVE_API_BASE_URL.includes('dev.aliveinnovations.com')) {
-    logger.error('ALIVE_API_BASE_URL is pointing at the DEV environment in production - set ALIVE_API_BASE_URL to the production URL');
+// Set ALIVE_API_DEV_URL_CONFIRMED_AS_PROD=true on Render once you've confirmed
+// with Alive Innovations that dev.aliveinnovations.com IS their production API
+// (their subdomain is just named "dev" historically — single environment).
+const aliveDevUrlConfirmedAsProd = process.env.ALIVE_API_DEV_URL_CONFIRMED_AS_PROD === 'true';
+if (
+    process.env.NODE_ENV === 'production' &&
+    ALIVE_API_BASE_URL.includes('dev.aliveinnovations.com') &&
+    !aliveDevUrlConfirmedAsProd
+) {
+    logger.error('ALIVE_API_BASE_URL is pointing at the DEV environment in production - set ALIVE_API_BASE_URL to the production URL, or set ALIVE_API_DEV_URL_CONFIRMED_AS_PROD=true if Alive has confirmed dev.aliveinnovations.com is their production API');
 }
 if (process.env.NODE_ENV === 'production' && !process.env.ALIVE_API_KEY) {
     logger.error('ALIVE_API_KEY is not set in production - manufacturer ordering will fail');
