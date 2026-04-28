@@ -297,10 +297,13 @@ export class AuthService {
                 const tokenInfoRes = await axios.get(`https://oauth2.googleapis.com/tokeninfo?access_token=${googleToken}`);
                 const tokenInfo = tokenInfoRes.data;
 
+                // Google may return the client id in either azp or aud depending on the token shape.
+                const tokenClientId = tokenInfo.azp || tokenInfo.aud;
+console.log('GOOGLE ISSUE',tokenClientId, tokenInfo)
                 // CRITICAL: Verify that the token was issued for OUR app (Audience check)
-                if (tokenInfo.azp !== process.env.GOOGLE_CLIENT_ID) {
+                if (tokenClientId !== process.env.GOOGLE_CLIENT_ID) {
                     logger.warn('Google Access Token verification failed: Client ID mismatch', {
-                        tokenClientId: tokenInfo.azp,
+                        tokenClientId,
                         expectedClientId: process.env.GOOGLE_CLIENT_ID
                     });
                     throw new Error('Invalid Google token: Issued for a different application');
