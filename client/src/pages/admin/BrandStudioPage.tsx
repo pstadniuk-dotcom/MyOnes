@@ -26,6 +26,8 @@ import { cn } from '@/shared/lib/utils';
 // ── Model Options ───────────────────────────────────────────────────────────
 
 const IMAGE_MODEL_OPTIONS = [
+  { value: 'fal-ai/flux-pro/v1.1-ultra', label: 'FLUX Pro 1.1 Ultra', description: 'Latest — 2K hero shots, premium photorealism', supportsRef: false },
+  { value: 'fal-ai/seedream-4', label: 'Seedream 4', description: 'Latest — ByteDance with reference image support', supportsRef: true },
   { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism — hero shots, lifestyle, editorial', supportsRef: false },
   { value: 'fal-ai/flux-pro/kontext', label: 'FLUX Kontext', description: 'Edit/restyle with a reference image — brand consistency, mockups', supportsRef: true },
   { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, branded graphics, quotes', supportsRef: false },

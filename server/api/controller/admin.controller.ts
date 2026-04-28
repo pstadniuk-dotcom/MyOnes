@@ -1822,6 +1822,59 @@ export class AdminController {
         }
     }
 
+    /**
+     * Reset analytics by flipping every existing order to is_test_order=true.
+     * Used pre-launch to wipe internal/QA orders out of the dashboard without
+     * deleting any rows. Requires explicit confirmation in the body.
+     */
+    async bulkMarkAllOrdersAsTest(req: Request, res: Response) {
+        try {
+            const { confirm, before } = req.body || {};
+            if (confirm !== true) {
+                return res.status(400).json({ error: 'Must pass { confirm: true } to bulk mark orders as test' });
+            }
+            let beforeDate: Date | undefined;
+            if (before) {
+                const d = new Date(before);
+                if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid `before` date' });
+                beforeDate = d;
+            }
+            const result = await adminService.bulkMarkOrdersAsTest({ before: beforeDate });
+            await logAdminAction(req, 'order_test_flag', 'order', null, {
+                bulk: true,
+                isTest: true,
+                updated: result.updated,
+                before: beforeDate?.toISOString() ?? null,
+            });
+            res.json({ success: true, updated: result.updated });
+        } catch (error: any) {
+            logger.error('Error bulk marking orders as test', { error });
+            res.status(500).json({ error: 'Failed to bulk mark orders as test' });
+        }
+    }
+
+    /**
+     * Mark/unmark a user as a test user. When set to true, every order that
+     * user has placed is also flipped to is_test_order = true so analytics
+     * stay consistent. Future signups default to is_test_user = false (real),
+     * so this endpoint is only needed for staff/QA accounts created later.
+     */
+    async setUserTestFlag(req: Request, res: Response) {
+        try {
+            const { isTest } = req.body || {};
+            if (typeof isTest !== 'boolean') {
+                return res.status(400).json({ error: 'isTest (boolean) is required' });
+            }
+            const { user, ordersUpdated } = await adminService.setUserTestFlag(req.params.id, isTest);
+            await logAdminAction(req, 'user_test_flag', 'user', req.params.id, { isTest, ordersUpdated });
+            res.json({ user, ordersUpdated });
+        } catch (error: any) {
+            if (error?.message === 'USER_NOT_FOUND') return res.status(404).json({ error: 'User not found' });
+            logger.error('Error setting user test flag', { error });
+            res.status(500).json({ error: 'Failed to set user test flag' });
+        }
+    }
+
     async getOrderActivity(req: Request, res: Response) {
         try {
             const limit = parseInt(req.query.limit as string) || 50;

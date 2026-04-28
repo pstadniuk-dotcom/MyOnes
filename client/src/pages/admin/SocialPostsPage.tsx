@@ -135,6 +135,8 @@ const TONES = [
 
 const IMAGE_MODEL_OPTIONS = [
   { value: '', label: 'Auto (Nano Banana 2)', description: 'Fast, affordable — uses brand assets when available' },
+  { value: 'fal-ai/flux-pro/v1.1-ultra', label: 'FLUX Pro 1.1 Ultra', description: 'Latest — 2K hero shots, premium photorealism' },
+  { value: 'fal-ai/seedream-4', label: 'Seedream 4', description: 'Latest — ByteDance, supports brand reference images' },
   { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism for hero shots' },
   { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, quotes, branded graphics' },
   { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations, icons, ingredient art' },

@@ -1196,6 +1196,16 @@ Return ONLY valid JSON.`;
         return order;
     }
 
+    async bulkMarkOrdersAsTest(options: { before?: Date } = {}) {
+        return adminRepository.bulkMarkOrdersAsTest(options);
+    }
+
+    async setUserTestFlag(userId: string, isTest: boolean) {
+        const result = await adminRepository.setUserTestFlag(userId, isTest);
+        if (!result.user) throw new Error('USER_NOT_FOUND');
+        return result;
+    }
+
     async resendOrderConfirmation(orderId: string): Promise<{ sent: boolean; reason?: string }> {
         const payload = await billingService.buildOrderConfirmationEmail(orderId);
         if (!payload) return { sent: false, reason: 'Order or user email unavailable' };

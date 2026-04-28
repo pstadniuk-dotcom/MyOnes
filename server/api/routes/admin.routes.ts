@@ -29,6 +29,7 @@ router.post('/users/bulk-delete', requireAdmin, adminController.bulkHardDeleteUs
 router.patch('/users/:id/admin-status', requireAdmin, adminController.updateUserAdminStatus);
 router.patch('/users/:id/suspend', requireAdmin, adminController.suspendUser);
 router.patch('/users/:id/unsuspend', requireAdmin, adminController.unsuspendUser);
+router.patch('/users/:id/test-flag', requireAdmin, adminController.setUserTestFlag);
 router.get('/users/:id/notes', requireAdmin, adminController.getUserNotes);
 router.post('/users/:id/notes', requireAdmin, adminController.addUserNote);
 
@@ -78,6 +79,7 @@ router.post('/orders/:id/void', requireAdmin, adminController.voidOrder);
 router.post('/orders/:id/resend-confirmation', requireAdmin, adminController.resendOrderConfirmation);
 router.post('/orders/:id/resend-shipping', requireAdmin, adminController.resendShippingNotification);
 router.patch('/orders/:id/test-flag', requireAdmin, adminController.setOrderTestFlag);
+router.post('/orders/bulk-mark-test', requireAdmin, adminController.bulkMarkAllOrdersAsTest);
 router.get('/orders/:id/activity', requireAdmin, adminController.getOrderActivity);
 router.get('/orders/:id/refunds', requireAdmin, adminController.getOrderRefunds);
 router.get('/orders/:id/transaction-state', requireAdmin, adminController.getOrderTransactionState);

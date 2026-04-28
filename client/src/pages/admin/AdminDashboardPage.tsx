@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Badge } from '@/shared/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useLocation } from 'wouter';
 import {
@@ -23,12 +23,17 @@ import {
   Globe,
   MessageSquare,
   Clock,
+  Percent,
+  Wallet,
+  Factory,
+  RotateCcw,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/shared/components/ui/button';
 import { getAuthHeaders } from '@/shared/lib/queryClient';
+import { apiRequest } from '@/shared/lib/queryClient';
 
 interface EnhancedStats {
   totalUsers: number;
@@ -56,6 +61,15 @@ interface FinancialMetrics {
   totalCustomers: number;
   churnRate: number;
   reorderRate: number;
+  totalCost: number;
+  totalRefunds: number;
+  netRevenue: number;
+  grossMarginPercent: number;
+  revenue30d: number;
+  cost30d: number;
+  refunds30d: number;
+  netRevenue30d: number;
+  grossMargin30dPercent: number;
 }
 
 interface RevenueDataPoint {
@@ -196,6 +210,8 @@ export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [dateRange] = useState('30');
+  const queryClient = useQueryClient();
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const { data: enhanced, isLoading: enhancedLoading, error: enhancedError } = useQuery<EnhancedStats>({
     queryKey: [`/api/admin/stats/enhanced?days=${dateRange}`],
@@ -231,6 +247,33 @@ export default function AdminDashboardPage() {
   }, [enhancedError, toast]);
 
   const [isExporting, setIsExporting] = useState(false);
+
+  const resetOrdersMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/orders/bulk-mark-test', { confirm: true });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Orders reset',
+        description: `${data.updated ?? 0} order${data.updated === 1 ? '' : 's'} marked as test. Dashboard totals will refresh.`,
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/stats/enhanced?days=${dateRange}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats/financial'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/analytics/revenue?days=${dateRange}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders/today'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics/pending-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+      setResetConfirmOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Reset failed',
+        description: error?.message || 'Could not mark orders as test.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -300,16 +343,55 @@ export default function AdminDashboardPage() {
         <h1 className="text-xl font-semibold text-gray-900">
           Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, let's get started.
         </h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleExport}
-          disabled={isExporting}
-        >
-          <Download className="h-4 w-4 mr-1.5" /> 
-          {isExporting ? 'Exporting...' : 'Export'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetConfirmOpen(true)}
+            disabled={resetOrdersMutation.isPending}
+            title="Mark all existing orders as test orders so they stop affecting revenue, margins, and projections."
+          >
+            <RotateCcw className="h-4 w-4 mr-1.5" />
+            {resetOrdersMutation.isPending ? 'Resetting...' : 'Reset orders data'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4 mr-1.5" />
+            {isExporting ? 'Exporting...' : 'Export'}
+          </Button>
+        </div>
       </div>
+
+      {resetConfirmOpen && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-900">Reset all orders to test orders?</p>
+              <p className="text-xs text-amber-800 mt-1">
+                This flips <span className="font-medium">every existing order</span> to <code className="px-1 bg-amber-100 rounded">is_test_order = true</code>. No rows are deleted &mdash; you can flip individual orders back from the Orders page. After this, revenue, margins, MRR, ARR, projections, and the sales chart will show only orders placed going forward.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => resetOrdersMutation.mutate()}
+                  disabled={resetOrdersMutation.isPending}
+                >
+                  Yes, mark all orders as test
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setResetConfirmOpen(false)} disabled={resetOrdersMutation.isPending}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Alerts Banner */}
       {totalPending > 0 && (
@@ -373,10 +455,67 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium">Financial Overview</CardTitle>
-            <CardDescription>Revenue metrics and customer health</CardDescription>
+            <CardDescription>Revenue, cost, and margin (test orders excluded)</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <CardContent className="space-y-4">
+            {/* Profitability row — the numbers Pete actually wants to see */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <FinancialCard
+                label="Net Revenue"
+                value={formatCurrency(financial.netRevenue)}
+                icon={Wallet}
+                description="Revenue − cost − refunds"
+              />
+              <FinancialCard
+                label="Manufacturer Cost"
+                value={formatCurrency(financial.totalCost)}
+                icon={Factory}
+                description="Lifetime cost of goods"
+              />
+              <FinancialCard
+                label="Gross Margin"
+                value={`${financial.grossMarginPercent}%`}
+                icon={Percent}
+                description="(Revenue − cost) / revenue"
+              />
+              <FinancialCard
+                label="Refunds"
+                value={formatCurrency(financial.totalRefunds)}
+                icon={UserMinus}
+                description="Lifetime refunded"
+              />
+            </div>
+
+            {/* Last-30-day profitability */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <FinancialCard
+                label="Net Revenue (30d)"
+                value={formatCurrency(financial.netRevenue30d)}
+                icon={Wallet}
+                description={`Rev ${formatCurrency(financial.revenue30d)} − cost ${formatCurrency(financial.cost30d)}`}
+              />
+              <FinancialCard
+                label="Cost (30d)"
+                value={formatCurrency(financial.cost30d)}
+                icon={Factory}
+                description="Manufacturer cost"
+              />
+              <FinancialCard
+                label="Margin (30d)"
+                value={`${financial.grossMargin30dPercent}%`}
+                icon={Percent}
+                description="Last 30 days"
+              />
+              <FinancialCard
+                label="Refunds (30d)"
+                value={formatCurrency(financial.refunds30d)}
+                icon={UserMinus}
+                description="Last 30 days"
+              />
+            </div>
+
+            {/* Existing customer / recurring metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 pt-1 border-t border-gray-100">
               <FinancialCard label="MRR" value={formatCurrency(financial.mrr)} icon={DollarSign} description="Monthly recurring" />
               <FinancialCard label="ARR" value={formatCurrency(financial.arr)} icon={DollarSign} description="Annual projection" />
               <FinancialCard label="AOV" value={formatCurrency(financial.averageOrderValue)} icon={Receipt} description="Avg order value" />

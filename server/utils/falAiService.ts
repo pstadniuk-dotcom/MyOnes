@@ -24,21 +24,27 @@ export function ensureFalConfigured() {
 export type ImageModelId =
   | 'fal-ai/flux/dev'
   | 'fal-ai/flux-pro/v1.1'
+  | 'fal-ai/flux-pro/v1.1-ultra'
   | 'fal-ai/flux-pro/kontext'
   | 'fal-ai/nano-banana-2'
   | 'fal-ai/nano-banana-2/edit'
   | 'fal-ai/ideogram/v3'
   | 'fal-ai/recraft-v3'
   | 'fal-ai/seedream-3'
+  | 'fal-ai/seedream-4'
   | 'fal-ai/pulid'
   | 'fal-ai/gpt-image-1';
 
 export type VideoModelId =
   | 'fal-ai/kling-video/v2.1/master/image-to-video'
   | 'fal-ai/kling-video/v3/pro/image-to-video'
+  | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
   | 'fal-ai/minimax-video/image-to-video'
   | 'fal-ai/wan/v2.1/image-to-video'
-  | 'fal-ai/seedance/video';
+  | 'fal-ai/seedance/video'
+  | 'fal-ai/veo3.1/image-to-video'
+  | 'fal-ai/veo3.1/fast/image-to-video'
+  | 'fal-ai/sora-2/image-to-video';
 
 export type UpscaleModelId =
   | 'fal-ai/creative-upscaler';
@@ -72,6 +78,16 @@ export const IMAGE_MODELS: Record<ImageModelId, ModelInfo> = {
     category: 'image',
     bestFor: ['hero-images', 'product-photos', 'lifestyle', 'editorial'],
     costTier: 'medium',
+    supportsReferenceImages: false,
+    supportsNegativePrompt: true,
+  },
+  'fal-ai/flux-pro/v1.1-ultra': {
+    id: 'fal-ai/flux-pro/v1.1-ultra',
+    name: 'FLUX Pro 1.1 Ultra',
+    description: 'Highest quality FLUX — 2K resolution, photorealistic, premium hero shots',
+    category: 'image',
+    bestFor: ['hero-images', 'editorial', 'premium-product-photos'],
+    costTier: 'high',
     supportsReferenceImages: false,
     supportsNegativePrompt: true,
   },
@@ -133,6 +149,16 @@ export const IMAGE_MODELS: Record<ImageModelId, ModelInfo> = {
     bestFor: ['editorial', 'stylized', 'hero-images'],
     costTier: 'medium',
     supportsReferenceImages: false,
+    supportsNegativePrompt: true,
+  },
+  'fal-ai/seedream-4': {
+    id: 'fal-ai/seedream-4',
+    name: 'Seedream 4',
+    description: 'ByteDance latest — superior text rendering, photorealism, and reference image support',
+    category: 'image',
+    bestFor: ['editorial', 'hero-images', 'product-photos', 'text-overlays'],
+    costTier: 'medium',
+    supportsReferenceImages: true,
     supportsNegativePrompt: true,
   },
   'fal-ai/pulid': {
@@ -201,12 +227,52 @@ export const VIDEO_MODELS: Record<VideoModelId, ModelInfo> = {
   'fal-ai/seedance/video': {
     id: 'fal-ai/seedance/video',
     name: 'Seed Dance 2.0',
-    description: 'ByteDance latest — cinematic motion, superior human movement and expressions',
+    description: 'ByteDance — cinematic motion, superior human movement and expressions',
     category: 'video',
     bestFor: ['ugc-scenes', 'ads', 'product-demos', 'cinematic', 'human-motion'],
     costTier: 'high',
     supportsReferenceImages: false,
     supportsNegativePrompt: true,
+  },
+  'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': {
+    id: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+    name: 'Kling 2.5 Turbo Pro',
+    description: 'Latest Kling — faster, sharper, better prompt adherence than 2.1 Master',
+    category: 'video',
+    bestFor: ['ugc-scenes', 'ads', 'product-demos', 'cinematic'],
+    costTier: 'high',
+    supportsReferenceImages: false,
+    supportsNegativePrompt: true,
+  },
+  'fal-ai/veo3.1/image-to-video': {
+    id: 'fal-ai/veo3.1/image-to-video',
+    name: 'Veo 3.1',
+    description: 'Google DeepMind state-of-the-art — native audio, cinematic quality, best-in-class',
+    category: 'video',
+    bestFor: ['ugc-scenes', 'ads', 'cinematic', 'human-motion', 'product-demos'],
+    costTier: 'high',
+    supportsReferenceImages: false,
+    supportsNegativePrompt: true,
+  },
+  'fal-ai/veo3.1/fast/image-to-video': {
+    id: 'fal-ai/veo3.1/fast/image-to-video',
+    name: 'Veo 3.1 Fast',
+    description: 'Faster, more affordable Veo 3.1 — same quality tier, lower cost',
+    category: 'video',
+    bestFor: ['ugc-scenes', 'ads', 'social-clips', 'product-demos'],
+    costTier: 'medium',
+    supportsReferenceImages: false,
+    supportsNegativePrompt: true,
+  },
+  'fal-ai/sora-2/image-to-video': {
+    id: 'fal-ai/sora-2/image-to-video',
+    name: 'Sora 2',
+    description: 'OpenAI Sora 2 — cinematic, narrative-rich video with strong physics',
+    category: 'video',
+    bestFor: ['ugc-scenes', 'cinematic', 'ads', 'storytelling'],
+    costTier: 'high',
+    supportsReferenceImages: false,
+    supportsNegativePrompt: false,
   },
 };
 
@@ -344,13 +410,17 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
       break;
     }
 
-    case 'fal-ai/seedream-3': {
+    case 'fal-ai/seedream-3':
+    case 'fal-ai/seedream-4': {
       result = await fal.subscribe(modelId, {
         input: {
           prompt: options.prompt,
           negative_prompt: options.negativePrompt,
           image_size: options.imageSize || 'landscape_16_9',
           num_images: options.numImages || 1,
+          ...(modelId === 'fal-ai/seedream-4' && options.referenceImageUrls?.length
+            ? { image_urls: options.referenceImageUrls.slice(0, 5) }
+            : {}),
         },
       });
       break;
@@ -425,6 +495,39 @@ export async function generateVideo(options: GenerateVideoOptions): Promise<Gene
         aspect_ratio: options.aspectRatio || '16:9',
       },
     });
+  } else if (modelId === 'fal-ai/veo3.1/image-to-video' || modelId === 'fal-ai/veo3.1/fast/image-to-video') {
+    // Veo 3.1 — supports native audio + 8s clips
+    result = await fal.subscribe(modelId, {
+      input: {
+        prompt: options.prompt,
+        image_url: options.startFrameImageUrl,
+        aspect_ratio: (options.aspectRatio || '16:9') as any,
+        duration: '8s',
+        generate_audio: true,
+        resolution: '1080p',
+      } as any,
+    });
+  } else if (modelId === 'fal-ai/sora-2/image-to-video') {
+    // OpenAI Sora 2 — cinematic, no negative prompt
+    result = await fal.subscribe(modelId, {
+      input: {
+        prompt: options.prompt,
+        image_url: options.startFrameImageUrl,
+        aspect_ratio: (options.aspectRatio || '16:9') as any,
+        duration: (options.durationSeconds === 10 ? '10s' : '5s') as any,
+      } as any,
+    });
+  } else if (modelId === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
+    // Kling 2.5 Turbo Pro — same shape as 2.1 Master but newer/faster
+    result = await fal.subscribe(modelId, {
+      input: {
+        prompt: options.prompt,
+        image_url: options.startFrameImageUrl,
+        negative_prompt: options.negativePrompt || 'phone in hand, holding phone, blurry, out of focus, motion blur, low quality, deformed',
+        duration: options.durationSeconds === 10 ? '10' : '5',
+        cfg_scale: Math.min(options.cfgScale || 0.7, 1),
+      },
+    });
   } else {
     result = await fal.subscribe(modelId, {
       input: {
@@ -437,7 +540,10 @@ export async function generateVideo(options: GenerateVideoOptions): Promise<Gene
     });
   }
 
-  const videoUrl = (result.data as any)?.video?.url;
+  // Veo / Sora return video at .video.url, but some shapes return .video as string
+  const videoUrl =
+    (result.data as any)?.video?.url ||
+    (typeof (result.data as any)?.video === 'string' ? (result.data as any).video : undefined);
   if (!videoUrl) throw new Error(`${model?.name || modelId} returned no video URL`);
 
   logger.info(`[fal-ai] Video generated successfully with ${model?.name || modelId}`);

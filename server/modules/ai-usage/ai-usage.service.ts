@@ -59,17 +59,23 @@ const FAL_PRICING_CENTS: Record<string, number> = {
   'fal-ai/nano-banana-2/edit':         2,    // ~$0.02
   'fal-ai/flux/dev':                   3,    // ~$0.03
   'fal-ai/flux-pro/v1.1':             5,    // ~$0.05
+  'fal-ai/flux-pro/v1.1-ultra':       6,    // ~$0.06
   'fal-ai/flux-pro/kontext':          5,    // ~$0.05
   'fal-ai/ideogram/v3':               8,    // ~$0.08
   'fal-ai/recraft-v3':                5,    // ~$0.05
   'fal-ai/seedream-3':                4,    // ~$0.04
+  'fal-ai/seedream-4':                5,    // ~$0.05
   'fal-ai/gpt-image-1':              10,    // ~$0.10
   'fal-ai/pulid':                      4,    // ~$0.04
   'fal-ai/kling-video/v2.1/master/image-to-video': 50, // ~$0.50
+  'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': 35, // ~$0.35 (turbo — cheaper)
   'fal-ai/kling-video/v3/pro/image-to-video':      75, // ~$0.75
   'fal-ai/minimax-video/image-to-video':            40, // ~$0.40
   'fal-ai/wan/v2.1/image-to-video':                 30, // ~$0.30
   'fal-ai/seedance/video':                          60, // ~$0.60
+  'fal-ai/veo3.1/image-to-video':                  300, // ~$3.00 (premium, 8s w/ audio)
+  'fal-ai/veo3.1/fast/image-to-video':              80, // ~$0.80
+  'fal-ai/sora-2/image-to-video':                  150, // ~$1.50
   'fal-ai/sync-lipsync':             20,    // ~$0.20
   'fal-ai/creative-upscaler':         5,    // ~$0.05
   'fal-ai/bria/background/remove':     2,    // ~$0.02

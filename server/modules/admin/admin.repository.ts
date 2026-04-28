@@ -67,6 +67,22 @@ function decryptMessageContent(content: string): string {
     }
 }
 
+// Reusable filter: exclude test orders from all financial / analytics aggregations.
+// Test orders should never affect revenue, MRR, ARR, margin, charts, totals, or counts
+// shown in the admin dashboard. Admins can still view them in the Orders page by
+// toggling "Hide test orders" off.
+const NOT_TEST = eq(orders.isTestOrder, false);
+
+// Reusable filter: exclude test users from all admin analytics. Test users
+// are pre-launch QA accounts, internal staff, etc. flagged via
+// `users.is_test_user`. New signups default to false (real customer).
+// Marking a user as test also cascades is_test_order=true on their orders
+// (see PATCH /api/admin/users/:id/test-flag), so order-level NOT_TEST is
+// usually enough — but for queries that count *users* directly
+// (signups, growth, funnel, conversation intelligence, etc.) we apply
+// NOT_TEST_USER explicitly.
+const NOT_TEST_USER = eq(users.isTestUser, false);
+
 export class AdminRepository {
     async getAdminStats(): Promise<{
         totalUsers: number;
@@ -77,28 +93,36 @@ export class AdminRepository {
         totalFormulas: number;
     }> {
         try {
-            const [userStats] = await db.select({ count: count() }).from(users);
+            const [userStats] = await db.select({ count: count() }).from(users).where(NOT_TEST_USER);
             const totalUsers = Number(userStats?.count || 0);
 
-            const [formulaStats] = await db.select({ count: count() }).from(formulas);
+            const [formulaStats] = await db
+                .select({ count: count() })
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(NOT_TEST_USER);
             const totalFormulas = Number(formulaStats?.count || 0);
 
-            const [orderStats] = await db.select({ count: count() }).from(orders);
+            const [orderStats] = await db.select({ count: count() }).from(orders).where(NOT_TEST);
             const totalOrders = Number(orderStats?.count || 0);
 
             const paidUsersResult = await db
                 .selectDistinct({ userId: orders.userId })
-                .from(orders);
+                .from(orders)
+                .where(NOT_TEST);
             const totalPaidUsers = paidUsersResult.length;
 
             const usersWithFormulas = await db
                 .selectDistinct({ userId: formulas.userId })
-                .from(formulas);
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(NOT_TEST_USER);
             const activeUsers = usersWithFormulas.length;
 
             const [revenueStats] = await db
                 .select({ totalRevenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)` })
-                .from(orders);
+                .from(orders)
+                .where(NOT_TEST);
             const totalRevenue = Number(revenueStats?.totalRevenueCents || 0) / 100;
 
             return {
@@ -147,39 +171,49 @@ export class AdminRepository {
             previousStart.setDate(currentStart.getDate() - days);
 
             // Totals
-            const [userStats] = await db.select({ count: count() }).from(users);
+            const [userStats] = await db.select({ count: count() }).from(users).where(NOT_TEST_USER);
             const totalUsers = Number(userStats?.count || 0);
-            const [formulaStats] = await db.select({ count: count() }).from(formulas);
+            const [formulaStats] = await db
+                .select({ count: count() })
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(NOT_TEST_USER);
             const totalFormulas = Number(formulaStats?.count || 0);
-            const [orderStats] = await db.select({ count: count() }).from(orders);
+            const [orderStats] = await db.select({ count: count() }).from(orders).where(NOT_TEST);
             const totalOrders = Number(orderStats?.count || 0);
             const [revenueStats] = await db
                 .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
-                .from(orders);
+                .from(orders).where(NOT_TEST);
             const totalRevenue = Number(revenueStats?.total || 0) / 100;
 
             // Current period counts
             const [currentUsers] = await db.select({ count: count() }).from(users)
-                .where(gte(users.createdAt, currentStart));
+                .where(and(NOT_TEST_USER, gte(users.createdAt, currentStart)));
             const [previousUsers] = await db.select({ count: count() }).from(users)
-                .where(and(gte(users.createdAt, previousStart), lt(users.createdAt, currentStart)));
+                .where(and(NOT_TEST_USER, gte(users.createdAt, previousStart), lt(users.createdAt, currentStart)));
 
             const [currentOrders] = await db.select({ count: count() }).from(orders)
-                .where(gte(orders.placedAt, currentStart));
+                .where(and(NOT_TEST, gte(orders.placedAt, currentStart)));
             const [previousOrders] = await db.select({ count: count() }).from(orders)
-                .where(and(gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
+                .where(and(NOT_TEST, gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
 
             const [currentRevenue] = await db
                 .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
-                .from(orders).where(gte(orders.placedAt, currentStart));
+                .from(orders).where(and(NOT_TEST, gte(orders.placedAt, currentStart)));
             const [previousRevenue] = await db
                 .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
-                .from(orders).where(and(gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
+                .from(orders).where(and(NOT_TEST, gte(orders.placedAt, previousStart), lt(orders.placedAt, currentStart)));
 
-            const [currentFormulas] = await db.select({ count: count() }).from(formulas)
-                .where(gte(formulas.createdAt, currentStart));
-            const [previousFormulas] = await db.select({ count: count() }).from(formulas)
-                .where(and(gte(formulas.createdAt, previousStart), lt(formulas.createdAt, currentStart)));
+            const [currentFormulas] = await db
+                .select({ count: count() })
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(and(NOT_TEST_USER, gte(formulas.createdAt, currentStart)));
+            const [previousFormulas] = await db
+                .select({ count: count() })
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(and(NOT_TEST_USER, gte(formulas.createdAt, previousStart), lt(formulas.createdAt, currentStart)));
 
             const calcChange = (curr: number, prev: number) =>
                 prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
@@ -198,23 +232,23 @@ export class AdminRepository {
             sparklineStart.setDate(now.getDate() - 7);
 
             const dailyUsers = await db
-                .select({ date: sql<string>`DATE(created_at)`, count: count() })
+                .select({ date: sql<string>`DATE(${users.createdAt})`, count: count() })
                 .from(users)
-                .where(gte(users.createdAt, sparklineStart))
-                .groupBy(sql`DATE(created_at)`)
-                .orderBy(sql`DATE(created_at)`);
+                .where(and(NOT_TEST_USER, gte(users.createdAt, sparklineStart)))
+                .groupBy(sql`DATE(${users.createdAt})`)
+                .orderBy(sql`DATE(${users.createdAt})`);
 
             const dailyOrders = await db
                 .select({ date: sql<string>`DATE(placed_at)`, count: count() })
                 .from(orders)
-                .where(gte(orders.placedAt, sparklineStart))
+                .where(and(NOT_TEST, gte(orders.placedAt, sparklineStart)))
                 .groupBy(sql`DATE(placed_at)`)
                 .orderBy(sql`DATE(placed_at)`);
 
             const dailyRevenue = await db
                 .select({ date: sql<string>`DATE(placed_at)`, total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
                 .from(orders)
-                .where(gte(orders.placedAt, sparklineStart))
+                .where(and(NOT_TEST, gte(orders.placedAt, sparklineStart)))
                 .groupBy(sql`DATE(placed_at)`)
                 .orderBy(sql`DATE(placed_at)`);
 
@@ -272,22 +306,47 @@ export class AdminRepository {
         totalCustomers: number;
         churnRate: number;
         reorderRate: number;
+        // Margin / cost metrics (lifetime, real orders only)
+        totalCost: number;          // Sum of manufacturer_cost_cents (USD)
+        totalRefunds: number;       // Sum of refunds.amount_cents for non-test orders (USD)
+        netRevenue: number;         // totalRevenue - totalCost - totalRefunds
+        grossMarginPercent: number; // (totalRevenue - totalCost) / totalRevenue * 100
+        // Last-30-day window
+        revenue30d: number;
+        cost30d: number;
+        refunds30d: number;
+        netRevenue30d: number;
+        grossMargin30dPercent: number;
     }> {
         try {
-            // Total revenue and orders
+            // Total revenue, cost, and orders (REAL orders only — test flag excluded)
             const [revStats] = await db
                 .select({
                     totalRevenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)`,
+                    totalCostCents: sql<number>`COALESCE(SUM(manufacturer_cost_cents), 0)`,
                     totalOrders: count(),
                 })
-                .from(orders);
+                .from(orders)
+                .where(NOT_TEST);
 
             const totalRevenueCents = Number(revStats?.totalRevenueCents || 0);
+            const totalCostCents = Number(revStats?.totalCostCents || 0);
             const totalOrders = Number(revStats?.totalOrders || 0);
             const averageOrderValue = totalOrders > 0 ? totalRevenueCents / totalOrders / 100 : 0;
 
-            // Distinct paying customers
-            const payingCustomers = await db.selectDistinct({ userId: orders.userId }).from(orders);
+            // Refunds tied to non-test orders only.
+            const [refundStats] = await db
+                .select({ total: sql<number>`COALESCE(SUM(${refunds.amountCents}), 0)` })
+                .from(refunds)
+                .innerJoin(orders, eq(refunds.orderId, orders.id))
+                .where(NOT_TEST);
+            const totalRefundsCents = Number(refundStats?.total || 0);
+
+            // Distinct paying customers (real orders)
+            const payingCustomers = await db
+                .selectDistinct({ userId: orders.userId })
+                .from(orders)
+                .where(NOT_TEST);
             const totalCustomers = payingCustomers.length;
 
             // LTV = total revenue / total customers
@@ -296,17 +355,31 @@ export class AdminRepository {
             // Revenue in last 30 days for MRR approximation
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const [recentRev] = await db
-                .select({ total: sql<number>`COALESCE(SUM(amount_cents), 0)` })
+            const [recent] = await db
+                .select({
+                    revenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)`,
+                    costCents: sql<number>`COALESCE(SUM(manufacturer_cost_cents), 0)`,
+                })
                 .from(orders)
-                .where(gte(orders.placedAt, thirtyDaysAgo));
-            const mrr = Number(recentRev?.total || 0) / 100;
+                .where(and(NOT_TEST, gte(orders.placedAt, thirtyDaysAgo)));
+            const revenue30dCents = Number(recent?.revenueCents || 0);
+            const cost30dCents = Number(recent?.costCents || 0);
+            const mrr = revenue30dCents / 100;
             const arr = mrr * 12;
+
+            // Refunds in last 30 days (non-test orders)
+            const [recentRefunds] = await db
+                .select({ total: sql<number>`COALESCE(SUM(${refunds.amountCents}), 0)` })
+                .from(refunds)
+                .innerJoin(orders, eq(refunds.orderId, orders.id))
+                .where(and(NOT_TEST, gte(refunds.createdAt, thirtyDaysAgo)));
+            const refunds30dCents = Number(recentRefunds?.total || 0);
 
             // Reorder rate: users with 2+ orders / users with 1+ orders
             const orderCounts = await db
                 .select({ userId: orders.userId, cnt: count() })
                 .from(orders)
+                .where(NOT_TEST)
                 .groupBy(orders.userId);
             const repeatCustomers = orderCounts.filter(c => Number(c.cnt) >= 2).length;
             const reorderRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
@@ -317,10 +390,19 @@ export class AdminRepository {
             const recentOrderUsers = await db
                 .selectDistinct({ userId: orders.userId })
                 .from(orders)
-                .where(gte(orders.placedAt, sixtyDaysAgo));
+                .where(and(NOT_TEST, gte(orders.placedAt, sixtyDaysAgo)));
             const recentSet = new Set(recentOrderUsers.map(r => r.userId));
             const churned = payingCustomers.filter(c => !recentSet.has(c.userId)).length;
             const churnRate = totalCustomers > 0 ? Math.round((churned / totalCustomers) * 100) : 0;
+
+            const grossProfitCents = totalRevenueCents - totalCostCents;
+            const grossMarginPercent = totalRevenueCents > 0
+                ? Math.round((grossProfitCents / totalRevenueCents) * 1000) / 10
+                : 0;
+            const grossProfit30dCents = revenue30dCents - cost30dCents;
+            const grossMargin30dPercent = revenue30dCents > 0
+                ? Math.round((grossProfit30dCents / revenue30dCents) * 1000) / 10
+                : 0;
 
             return {
                 mrr: Math.round(mrr * 100) / 100,
@@ -330,10 +412,24 @@ export class AdminRepository {
                 totalCustomers,
                 churnRate,
                 reorderRate,
+                totalCost: Math.round(totalCostCents) / 100,
+                totalRefunds: Math.round(totalRefundsCents) / 100,
+                netRevenue: Math.round(totalRevenueCents - totalCostCents - totalRefundsCents) / 100,
+                grossMarginPercent,
+                revenue30d: Math.round(revenue30dCents) / 100,
+                cost30d: Math.round(cost30dCents) / 100,
+                refunds30d: Math.round(refunds30dCents) / 100,
+                netRevenue30d: Math.round(revenue30dCents - cost30dCents - refunds30dCents) / 100,
+                grossMargin30dPercent,
             };
         } catch (error) {
             logger.error('Error getting financial metrics', { error });
-            return { mrr: 0, arr: 0, averageOrderValue: 0, ltv: 0, totalCustomers: 0, churnRate: 0, reorderRate: 0 };
+            return {
+                mrr: 0, arr: 0, averageOrderValue: 0, ltv: 0,
+                totalCustomers: 0, churnRate: 0, reorderRate: 0,
+                totalCost: 0, totalRefunds: 0, netRevenue: 0, grossMarginPercent: 0,
+                revenue30d: 0, cost30d: 0, refunds30d: 0, netRevenue30d: 0, grossMargin30dPercent: 0,
+            };
         }
     }
 
@@ -344,18 +440,18 @@ export class AdminRepository {
 
             const dailyUsers = await db
                 .select({
-                    date: sql<string>`DATE(created_at)`,
+                    date: sql<string>`DATE(${users.createdAt})`,
                     count: count()
                 })
                 .from(users)
-                .where(gte(users.createdAt, startDate))
-                .groupBy(sql`DATE(created_at)`)
-                .orderBy(sql`DATE(created_at)`);
+                .where(and(NOT_TEST_USER, gte(users.createdAt, startDate)))
+                .groupBy(sql`DATE(${users.createdAt})`)
+                .orderBy(sql`DATE(${users.createdAt})`);
 
             const paidUserIds = await db
                 .selectDistinct({ userId: orders.userId, orderDate: sql<string>`DATE(placed_at)` })
                 .from(orders)
-                .where(gte(orders.placedAt, startDate));
+                .where(and(NOT_TEST, gte(orders.placedAt, startDate)));
 
             let cumulativeUsers = 0;
             let cumulativePaid = 0;
@@ -393,7 +489,7 @@ export class AdminRepository {
                     revenueCents: sql<number>`COALESCE(SUM(amount_cents), 0)`
                 })
                 .from(orders)
-                .where(gte(orders.placedAt, startDate))
+                .where(and(NOT_TEST, gte(orders.placedAt, startDate)))
                 .groupBy(sql`DATE(placed_at)`)
                 .orderBy(sql`DATE(placed_at)`);
 
@@ -659,7 +755,7 @@ export class AdminRepository {
             const todayOrders = await db
                 .select()
                 .from(orders)
-                .where(gte(orders.placedAt, todayStart))
+                .where(and(NOT_TEST, gte(orders.placedAt, todayStart)))
                 .orderBy(desc(orders.placedAt));
 
             const enrichedOrders = await Promise.all(
@@ -1155,7 +1251,9 @@ export class AdminRepository {
         total: number;
     }> {
         try {
-            const dateConditions = [eq(messages.role, 'user')];
+            // Always exclude messages from test users so conversation intelligence,
+            // ingredient demand analysis, and AI insights only reflect real customers.
+            const dateConditions = [eq(messages.role, 'user'), NOT_TEST_USER];
             if (startDate) {
                 dateConditions.push(gte(messages.createdAt, startDate));
             }
@@ -1166,6 +1264,8 @@ export class AdminRepository {
             const [{ count: totalCount }] = await db
                 .select({ count: sql<number>`count(*)` })
                 .from(messages)
+                .innerJoin(chatSessions, eq(messages.sessionId, chatSessions.id))
+                .innerJoin(users, eq(chatSessions.userId, users.id))
                 .where(and(...dateConditions));
 
             const userMessages = await db
@@ -1177,6 +1277,7 @@ export class AdminRepository {
                 })
                 .from(messages)
                 .innerJoin(chatSessions, eq(messages.sessionId, chatSessions.id))
+                .innerJoin(users, eq(chatSessions.userId, users.id))
                 .where(and(...dateConditions))
                 .orderBy(desc(messages.createdAt))
                 .limit(limit);
@@ -1201,7 +1302,9 @@ export class AdminRepository {
         total: number;
     }> {
         try {
-            const dateConditions = [];
+            // Exclude conversations belonging to test users from the conversation
+            // intelligence list and counts.
+            const dateConditions: any[] = [NOT_TEST_USER];
             if (startDate) {
                 dateConditions.push(gte(chatSessions.createdAt, startDate));
             }
@@ -1212,7 +1315,8 @@ export class AdminRepository {
             const [{ count: totalCount }] = await db
                 .select({ count: sql<number>`count(*)` })
                 .from(chatSessions)
-                .where(dateConditions.length > 0 ? and(...dateConditions) : undefined);
+                .innerJoin(users, eq(chatSessions.userId, users.id))
+                .where(and(...dateConditions));
 
             const sessionsWithUsers = await db
                 .select({
@@ -1223,7 +1327,7 @@ export class AdminRepository {
                 })
                 .from(chatSessions)
                 .innerJoin(users, eq(chatSessions.userId, users.id))
-                .where(dateConditions.length > 0 ? and(...dateConditions) : undefined)
+                .where(and(...dateConditions))
                 .orderBy(desc(chatSessions.createdAt))
                 .limit(limit)
                 .offset(offset);
@@ -1358,29 +1462,36 @@ export class AdminRepository {
 
     async getConversionFunnel(): Promise<any> {
         try {
-            const [signupCount] = await db.select({ count: count() }).from(users);
+            const [signupCount] = await db.select({ count: count() }).from(users).where(NOT_TEST_USER);
             const totalSignups = Number(signupCount?.count || 0);
 
             const profilesComplete = await db
                 .select({ userId: healthProfiles.userId })
                 .from(healthProfiles)
+                .innerJoin(users, eq(healthProfiles.userId, users.id))
                 .where(
-                    or(
-                        isNotNull(healthProfiles.age),
-                        isNotNull(healthProfiles.sex),
-                        sql`jsonb_array_length(${healthProfiles.healthGoals}) > 0`
+                    and(
+                        NOT_TEST_USER,
+                        or(
+                            isNotNull(healthProfiles.age),
+                            isNotNull(healthProfiles.sex),
+                            sql`jsonb_array_length(${healthProfiles.healthGoals}) > 0`
+                        )
                     )
                 );
             const profileCount = profilesComplete.length;
 
             const usersWithFormula = await db
                 .selectDistinct({ userId: formulas.userId })
-                .from(formulas);
+                .from(formulas)
+                .innerJoin(users, eq(formulas.userId, users.id))
+                .where(NOT_TEST_USER);
             const formulaCount = usersWithFormula.length;
 
             const usersWithOrders = await db
                 .selectDistinct({ userId: orders.userId })
-                .from(orders);
+                .from(orders)
+                .where(NOT_TEST);
             const firstOrderCount = usersWithOrders.length;
 
             const orderCounts = await db
@@ -1389,6 +1500,7 @@ export class AdminRepository {
                     orderCount: count()
                 })
                 .from(orders)
+                .where(NOT_TEST)
                 .groupBy(orders.userId);
             const reorderCount = orderCounts.filter(oc => Number(oc.orderCount) > 1).length;
 
@@ -1426,7 +1538,7 @@ export class AdminRepository {
                 const cohortUsers = await db
                     .select({ id: users.id })
                     .from(users)
-                    .where(and(gte(users.createdAt, cohortStart), lte(users.createdAt, cohortEnd)));
+                    .where(and(NOT_TEST_USER, gte(users.createdAt, cohortStart), lte(users.createdAt, cohortEnd)));
                 const totalUsers = cohortUsers.length;
                 const userIds = cohortUsers.map(u => u.id);
 
@@ -1645,8 +1757,8 @@ export class AdminRepository {
     async getPendingActions(): Promise<any> {
         try {
             const [ticketCount] = await db.select({ count: count() }).from(supportTickets).where(eq(supportTickets.status, 'open'));
-            const [pendingCount] = await db.select({ count: count() }).from(orders).where(eq(orders.status, 'pending'));
-            const [processingCount] = await db.select({ count: count() }).from(orders).where(eq(orders.status, 'processing'));
+            const [pendingCount] = await db.select({ count: count() }).from(orders).where(and(NOT_TEST, eq(orders.status, 'pending')));
+            const [processingCount] = await db.select({ count: count() }).from(orders).where(and(NOT_TEST, eq(orders.status, 'processing')));
             const reorderHealth = await this.getReorderHealth();
 
             return {
@@ -1666,41 +1778,56 @@ export class AdminRepository {
         try {
             const activities: any[] = [];
 
-            const recentUsers = await db.select().from(users).orderBy(desc(users.createdAt)).limit(limit);
+            // All four streams below filter out test users so the feed only
+            // surfaces real-customer activity. Order events also rely on NOT_TEST
+            // (cascaded when a user is flagged), so legacy test-only orders
+            // already in the DB are excluded too.
+            const recentUsers = await db.select().from(users)
+                .where(NOT_TEST_USER)
+                .orderBy(desc(users.createdAt))
+                .limit(limit);
             for (const u of recentUsers) {
                 activities.push({ type: 'signup', id: u.id, userId: u.id, userName: u.name, description: `${u.name} signed up`, timestamp: u.createdAt });
             }
 
             // Fetch orders and their users in 2 queries instead of N+1
-            const recentOrders = await db.select().from(orders).orderBy(desc(orders.placedAt)).limit(limit);
+            const recentOrders = await db.select().from(orders)
+                .where(NOT_TEST)
+                .orderBy(desc(orders.placedAt))
+                .limit(limit);
             if (recentOrders.length > 0) {
                 const orderUserIds = [...new Set(recentOrders.map(o => o.userId))];
-                const orderUsers = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, orderUserIds));
-                const orderUserMap = new Map(orderUsers.map(u => [u.id, u.name]));
+                const orderUsers = await db.select({ id: users.id, name: users.name, isTestUser: users.isTestUser })
+                    .from(users).where(inArray(users.id, orderUserIds));
+                const orderUserMap = new Map(orderUsers.filter(u => !u.isTestUser).map(u => [u.id, u.name]));
                 for (const o of recentOrders) {
-                    const userName = orderUserMap.get(o.userId) || 'Unknown';
+                    const userName = orderUserMap.get(o.userId);
+                    if (!userName) continue;
                     activities.push({ type: 'order', id: o.id, userId: o.userId, userName, description: `${userName} placed an order`, timestamp: o.placedAt, metadata: { status: o.status, amountCents: o.amountCents } });
                 }
             }
 
             // Fetch formulas and their users in 2 queries instead of N+1
-            const recentFormulas = await db.select().from(formulas).orderBy(desc(formulas.createdAt)).limit(limit);
+            const recentFormulas = await db.select().from(formulas).orderBy(desc(formulas.createdAt)).limit(limit * 2);
             if (recentFormulas.length > 0) {
                 const formulaUserIds = [...new Set(recentFormulas.map(f => f.userId))];
-                const formulaUsers = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, formulaUserIds));
-                const formulaUserMap = new Map(formulaUsers.map(u => [u.id, u.name]));
+                const formulaUsers = await db.select({ id: users.id, name: users.name, isTestUser: users.isTestUser })
+                    .from(users).where(inArray(users.id, formulaUserIds));
+                const formulaUserMap = new Map(formulaUsers.filter(u => !u.isTestUser).map(u => [u.id, u.name]));
                 for (const f of recentFormulas) {
-                    const userName = formulaUserMap.get(f.userId) || 'Unknown';
+                    const userName = formulaUserMap.get(f.userId);
+                    if (!userName) continue;
                     activities.push({ type: 'formula', id: f.id, userId: f.userId, userName, description: `${userName} ${f.version > 1 ? 'updated' : 'created'} their formula`, timestamp: f.createdAt, metadata: { version: f.version, totalMg: f.totalMg } });
                 }
             }
 
             // Fetch tickets and their users in 2 queries instead of N+1
-            const recentTickets = await db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt)).limit(limit);
+            const recentTickets = await db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt)).limit(limit * 2);
             if (recentTickets.length > 0) {
                 const ticketUserIds = [...new Set(recentTickets.map(t => t.userId))];
-                const ticketUsers = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ticketUserIds));
-                const ticketUserMap = new Map(ticketUsers.map(u => [u.id, u.name]));
+                const ticketUsers = await db.select({ id: users.id, name: users.name, isTestUser: users.isTestUser })
+                    .from(users).where(inArray(users.id, ticketUserIds));
+                const ticketUserMap = new Map(ticketUsers.filter(u => !u.isTestUser).map(u => [u.id, u.name]));
                 for (const t of recentTickets) {
                     const userName = ticketUserMap.get(t.userId) || 'Unknown';
                     activities.push({ type: 'ticket', id: t.id, userId: t.userId, userName, description: `${userName} opened a support ticket: ${t.subject}`, timestamp: t.createdAt, metadata: { status: t.status, subject: t.subject } });
@@ -1792,6 +1919,54 @@ export class AdminRepository {
         } catch (error) {
             logger.error('Error setting test flag', { error, id });
             return undefined;
+        }
+    }
+
+    /**
+     * Bulk-mark every existing order as a test order. Used to reset analytics
+     * before going live, since pre-launch orders are all internal QA / staging.
+     * Optionally accepts a `before` cutoff so only historical orders are flipped.
+     */
+    async bulkMarkOrdersAsTest(options: { before?: Date } = {}): Promise<{ updated: number }> {
+        try {
+            const where = options.before
+                ? and(eq(orders.isTestOrder, false), lt(orders.placedAt, options.before))
+                : eq(orders.isTestOrder, false);
+            const result = await db.update(orders).set({ isTestOrder: true }).where(where).returning({ id: orders.id });
+            return { updated: result.length };
+        } catch (error) {
+            logger.error('Error bulk marking orders as test', { error });
+            return { updated: 0 };
+        }
+    }
+
+    /**
+     * Toggle a single user's test flag and (when flipping to test) cascade
+     * is_test_order = true onto every order that user has placed. Returns the
+     * updated user and the number of orders cascaded so the caller can show it
+     * in audit logs / toast messages.
+     */
+    async setUserTestFlag(userId: string, isTest: boolean): Promise<{ user: User | undefined; ordersUpdated: number }> {
+        try {
+            const [user] = await db.update(users).set({ isTestUser: isTest }).where(eq(users.id, userId)).returning();
+            if (!user) return { user: undefined, ordersUpdated: 0 };
+
+            let ordersUpdated = 0;
+            if (isTest) {
+                // Cascade: every order from this user becomes a test order.
+                const updated = await db.update(orders)
+                    .set({ isTestOrder: true })
+                    .where(and(eq(orders.userId, userId), eq(orders.isTestOrder, false)))
+                    .returning({ id: orders.id });
+                ordersUpdated = updated.length;
+            }
+            // We deliberately do NOT auto-flip orders back to non-test when a user is
+            // restored to real — admins can do that per-order if needed, since the
+            // old orders may genuinely have been test transactions.
+            return { user, ordersUpdated };
+        } catch (error) {
+            logger.error('Error setting user test flag', { error, userId });
+            return { user: undefined, ordersUpdated: 0 };
         }
     }
 

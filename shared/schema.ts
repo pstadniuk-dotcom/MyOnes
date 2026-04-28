@@ -43,6 +43,7 @@ export const adminActionEnum = pgEnum('admin_action', [
   'order_status_change', 'order_refund', 'manufacturer_order_retry',
   'order_cancel_no_refund', 'order_void', 'order_email_resent', 'order_test_flag',
   'order_note_add', 'order_internal_view',
+  'user_test_flag',
   'ticket_status_change', 'ticket_assign', 'ticket_reply',
   'settings_update', 'settings_reset',
   'faq_create', 'faq_update', 'faq_delete',
@@ -72,6 +73,14 @@ export const users = pgTable("users", {
   // Admin and access tracking
   isAdmin: boolean("is_admin").default(false).notNull(),
   lastLoginAt: timestamp("last_login_at"),
+
+  // Test-user flag. When true, this user is excluded from all admin analytics
+  // (revenue, MRR/ARR, margins, growth, cohorts, funnel, conversation
+  // intelligence, activity feed, today's orders, etc.). Internal QA accounts,
+  // Pete's own accounts, and pre-launch testers should have this set to true.
+  // Defaults to false so every new signup is tracked as a real customer
+  // automatically. Toggle via PATCH /api/admin/users/:id/test-flag.
+  isTestUser: boolean("is_test_user").default(false).notNull(),
 
   // Address fields
   addressLine1: text("address_line1"),
@@ -173,6 +182,7 @@ export const users = pgTable("users", {
   index("users_referral_code_idx").on(table.referralCode),
   index("users_utm_source_idx").on(table.utmSource),
   index("users_signup_channel_idx").on(table.signupChannel),
+  index("users_is_test_user_idx").on(table.isTestUser),
 ]);
 
 // Password reset tokens

@@ -240,6 +240,8 @@ const IMAGE_TYPES = [
 
 const UGC_IMAGE_MODEL_OPTIONS = [
   { value: '__default', label: 'Auto (FLUX/dev)', description: 'Default with PuLID face-consistency' },
+  { value: 'fal-ai/flux-pro/v1.1-ultra', label: 'FLUX Pro 1.1 Ultra', description: 'Latest — 2K, photorealistic hero shots' },
+  { value: 'fal-ai/seedream-4', label: 'Seedream 4', description: 'Latest — ByteDance, supports reference images' },
   { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium quality' },
   { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Stylized editorial' },
   { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong photorealism' },
@@ -247,10 +249,14 @@ const UGC_IMAGE_MODEL_OPTIONS = [
 
 const UGC_VIDEO_MODEL_OPTIONS = [
   { value: '__default', label: 'Kling 2.1 Master', description: 'Current default, reliable' },
+  { value: 'fal-ai/veo3.1/image-to-video', label: 'Veo 3.1 (Latest)', description: 'Google DeepMind — native audio, best-in-class' },
+  { value: 'fal-ai/veo3.1/fast/image-to-video', label: 'Veo 3.1 Fast', description: 'Faster + cheaper Veo with audio' },
+  { value: 'fal-ai/sora-2/image-to-video', label: 'Sora 2', description: 'OpenAI — cinematic, narrative-rich' },
+  { value: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video', label: 'Kling 2.5 Turbo Pro', description: 'Latest Kling — sharper than 2.1' },
   { value: 'fal-ai/seedance/video', label: 'Seed Dance 2.0', description: 'Best human motion & expressions' },
-  { value: 'fal-ai/kling-video/v3/pro/image-to-video', label: 'Kling 3.0 Pro', description: 'Cinematic quality, native audio' },
-  { value: 'fal-ai/wan/v2.1/image-to-video', label: 'WAN 2.1', description: 'Smooth motion, great fidelity' },
-  { value: 'fal-ai/minimax-video/image-to-video', label: 'MiniMax Hailuo', description: 'High quality, smooth motion' },
+  { value: 'fal-ai/kling-video/v3/pro/image-to-video', label: 'Kling 3.0 Pro', description: 'Cinematic quality' },
+  { value: 'fal-ai/wan/v2.1/image-to-video', label: 'WAN 2.1', description: 'Smooth motion' },
+  { value: 'fal-ai/minimax-video/image-to-video', label: 'MiniMax Hailuo', description: 'High quality' },
 ];
 
 const PIPELINE_STAGES = ['Research', 'Hooks', 'Scripts', 'Characters', 'Video', 'Complete'];
