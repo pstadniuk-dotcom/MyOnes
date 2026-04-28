@@ -16,8 +16,8 @@ export default function LandingPageV2() {
     <div className="min-h-screen bg-[#ede8e2]">
       <HeaderV2 />
       <main className="bg-[#ede8e2]">
-        {/* Add padding for fixed header */}
-        <div className="pt-20">
+        {/* Add padding for fixed header (beta banner ~40px + nav 80px) */}
+        <div className="pt-[120px]">
           <HeroSectionV2 />
         </div>
         <ProblemFlowSection />

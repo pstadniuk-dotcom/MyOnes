@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Menu, X, User, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/shared/lib/utils";
+import BetaBanner from "./BetaBanner";
 
 export default function HeaderV2() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -66,6 +67,7 @@ export default function HeaderV2() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#ede8e2]/80 backdrop-blur-md border-b border-[#054700]/5">
+      <BetaBanner />
       <div className="w-full px-8 md:px-16 lg:px-16 xl:px-20">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
