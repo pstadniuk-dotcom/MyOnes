@@ -25,6 +25,7 @@ import { generateArticle } from './blogGenerationService';
 import { generateBlogImage } from './blogImageService';
 import { blogRepository } from '../modules/blog/blog.repository';
 import { TOPIC_CLUSTERS, getUnusedTopics, type TopicCluster } from '../../shared/topic-clusters';
+import { discoverDynamicTopics } from './dynamicTopicDiscovery';
 import { db } from '../infra/db/db';
 import { appSettings } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
@@ -157,6 +158,35 @@ export async function runDailyBlogGeneration(overrideSettings?: Partial<BlogAuto
 
   log(`${candidatePool.length} unused topics available across tiers: ${settings.tiers.join(', ')}`);
   if (skippedSet.size > 0) log(`SEO strategy: ${skippedSet.size} keywords skipped, ${pinnedSet.size} keywords pinned`);
+
+  // ── Top up with dynamically discovered topics ────────────────────────────
+  // The static cluster list (~198 entries) is finite and gets exhausted.
+  // Once we approach that ceiling, mine `keyword_data` for opportunities
+  // (high volume × low KD) not yet covered by published articles.
+  // We always blend dynamic topics in so the pool keeps growing — even when
+  // a few static entries remain — but never duplicate an existing keyword.
+  const minDesiredPool = Math.max(settings.articlesPerDay * 5, 50);
+  if (candidatePool.length < minDesiredPool) {
+    try {
+      const dynamicTopics = await discoverDynamicTopics({
+        minVolume: seoStrategy.minVolume && seoStrategy.minVolume > 0 ? seoStrategy.minVolume : 100,
+        maxKd: seoStrategy.maxKd && seoStrategy.maxKd > 0 ? seoStrategy.maxKd : 70,
+        limit: minDesiredPool * 2,
+        tiers: settings.tiers as TopicCluster['tier'][],
+      });
+      if (dynamicTopics.length) {
+        // Avoid double-adding any keyword already in the static pool.
+        const staticKeywords = new Set(candidatePool.map(c => c.primaryKeyword.toLowerCase()));
+        const fresh = dynamicTopics.filter(d => !staticKeywords.has(d.primaryKeyword.toLowerCase()));
+        candidatePool.push(...fresh);
+        log(`Topped up with ${fresh.length} dynamically discovered topics from keyword_data (top: "${fresh[0]?.primaryKeyword}" vol ${fresh[0]?.volume} kd ${fresh[0]?.kd})`);
+      } else {
+        log('Dynamic discovery returned 0 topics — keyword_data may need refresh');
+      }
+    } catch (err: any) {
+      log(`⚠ Dynamic topic discovery failed (continuing with static pool only): ${err.message}`);
+    }
+  }
 
   if (!candidatePool.length) {
     log('No unused topics remaining — run complete (no-op)');
