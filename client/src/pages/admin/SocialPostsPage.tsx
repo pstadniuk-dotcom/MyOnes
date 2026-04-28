@@ -133,16 +133,20 @@ const TONES = [
   { value: 'conversational', label: 'Conversational & Friendly' },
 ] as const;
 
+// Models flagged with `usesBrandRefs: true` send your uploaded brand assets
+// to fal.ai as `image_urls` so the output matches your brand style.
 const IMAGE_MODEL_OPTIONS = [
-  { value: '', label: 'Auto (Nano Banana 2)', description: 'Fast, affordable — uses brand assets when available' },
-  { value: 'fal-ai/flux-pro/v1.1-ultra', label: 'FLUX Pro 1.1 Ultra', description: 'Latest — 2K hero shots, premium photorealism' },
-  { value: 'fal-ai/seedream-4', label: 'Seedream 4', description: 'Latest — ByteDance, supports brand reference images' },
-  { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism for hero shots' },
-  { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, quotes, branded graphics' },
-  { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations, icons, ingredient art' },
-  { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Editorial and stylized imagery' },
-  { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong prompt adherence and photorealism' },
-  { value: 'fal-ai/flux/dev', label: 'FLUX.1 Dev', description: 'Good all-rounder, open-weight' },
+  { value: '', label: 'Auto (Nano Banana 2)', description: 'Fast — auto-uses brand assets when uploaded', usesBrandRefs: true },
+  { value: 'fal-ai/nano-banana-2/edit', label: 'Nano Banana 2 Edit', description: 'Style transfer from your brand assets (cheap)', usesBrandRefs: true },
+  { value: 'fal-ai/seedream-4', label: 'Seedream 4', description: 'Latest — ByteDance, supports brand reference images', usesBrandRefs: true },
+  { value: 'fal-ai/flux-pro/kontext', label: 'FLUX Kontext', description: 'Edit/restyle conditioned on a brand reference', usesBrandRefs: true },
+  { value: 'fal-ai/flux-pro/v1.1-ultra', label: 'FLUX Pro 1.1 Ultra', description: 'Latest — 2K hero shots (no brand refs)', usesBrandRefs: false },
+  { value: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro 1.1', description: 'Premium photorealism (no brand refs)', usesBrandRefs: false },
+  { value: 'fal-ai/ideogram/v3', label: 'Ideogram v3', description: 'Best text rendering — logos, quotes, branded graphics', usesBrandRefs: false },
+  { value: 'fal-ai/recraft-v3', label: 'Recraft v3', description: 'Illustrations, icons, ingredient art', usesBrandRefs: false },
+  { value: 'fal-ai/seedream-3', label: 'Seedream 3', description: 'Editorial and stylized imagery', usesBrandRefs: false },
+  { value: 'fal-ai/gpt-image-1', label: 'GPT Image 1', description: 'Strong prompt adherence and photorealism', usesBrandRefs: false },
+  { value: 'fal-ai/flux/dev', label: 'FLUX.1 Dev', description: 'Good all-rounder, open-weight', usesBrandRefs: false },
 ] as const;
 
 // ── Utility Components ────────────────────────────────────────────────────────
@@ -893,11 +897,22 @@ export default function SocialPostsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Social Content Studio</h1>
-        <p className="text-muted-foreground mt-1">
-          Generate AI-crafted social posts with images, headlines, and platform-optimized copy.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Social Content Studio</h1>
+          <p className="text-muted-foreground mt-1">
+            Generate AI-crafted social posts with images, headlines, and platform-optimized copy.
+          </p>
+        </div>
+        {brandAssets.length === 0 && (
+          <button
+            onClick={() => setActiveTab('brand')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 text-sm transition-colors"
+          >
+            <Upload className="h-4 w-4 text-amber-600" />
+            <span className="text-amber-900 font-medium">Upload brand reference images →</span>
+          </button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1086,14 +1101,39 @@ export default function SocialPostsPage() {
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    title="Select which AI model to use for image generation"
+                    title="Models marked ★ use your uploaded brand reference images"
                   >
                     {IMAGE_MODEL_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {opt.usesBrandRefs ? '★ ' : ''}{opt.label}
                       </option>
                     ))}
                   </select>
+                  {(() => {
+                    const selected = IMAGE_MODEL_OPTIONS.find(o => o.value === imageModel) || IMAGE_MODEL_OPTIONS[0];
+                    if (selected.usesBrandRefs && brandAssets.length > 0) {
+                      return (
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 flex items-center gap-1">
+                          <PaletteIcon className="h-3 w-3" /> Using {Math.min(brandAssets.length, 5)} brand ref{brandAssets.length === 1 ? '' : 's'}
+                        </span>
+                      );
+                    }
+                    if (selected.usesBrandRefs && brandAssets.length === 0) {
+                      return (
+                        <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 flex items-center gap-1">
+                          <PaletteIcon className="h-3 w-3" /> No brand assets — <button className="underline" onClick={() => setActiveTab('brand')}>upload some</button>
+                        </span>
+                      );
+                    }
+                    if (!selected.usesBrandRefs && brandAssets.length > 0) {
+                      return (
+                        <span className="text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-1 flex items-center gap-1" title="This model can't use reference images. Pick a ★ model to use your brand assets.">
+                          Brand refs ignored by this model
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                   {generatedPosts.some(p => !p.imageUrl) && (
                     <Button
                       variant="outline"
@@ -1190,14 +1230,32 @@ export default function SocialPostsPage() {
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    title="Select which AI model to use for image generation"
+                    title="Models marked ★ use your uploaded brand reference images"
                   >
                     {IMAGE_MODEL_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {opt.usesBrandRefs ? '★ ' : ''}{opt.label}
                       </option>
                     ))}
                   </select>
+                  {(() => {
+                    const selected = IMAGE_MODEL_OPTIONS.find(o => o.value === imageModel) || IMAGE_MODEL_OPTIONS[0];
+                    if (selected.usesBrandRefs && brandAssets.length > 0) {
+                      return (
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 flex items-center gap-1">
+                          <PaletteIcon className="h-3 w-3" /> Using {Math.min(brandAssets.length, 5)} brand ref{brandAssets.length === 1 ? '' : 's'}
+                        </span>
+                      );
+                    }
+                    if (selected.usesBrandRefs && brandAssets.length === 0) {
+                      return (
+                        <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 flex items-center gap-1">
+                          <PaletteIcon className="h-3 w-3" /> No brand assets — <button className="underline" onClick={() => setActiveTab('brand')}>upload some</button>
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                   {ideas.some(i => !i.imageUrl) && (
                     <Button
                       variant="outline"
