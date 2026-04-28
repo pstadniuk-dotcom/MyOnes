@@ -187,7 +187,7 @@ export default function HomePage() {
           <CardContent className="p-4 md:pt-5 md:px-6">
             {currentFormula ? (
               <div className="flex items-center justify-between gap-3 md:flex-col md:items-start">
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 w-full">
                   <p className="text-xs font-medium text-[#5a6623] mb-1">Current Formula</p>
                   <p className="text-base md:text-lg font-semibold text-[#054700] truncate">
                     {currentFormula.name || `Version ${currentFormula.version}`}
