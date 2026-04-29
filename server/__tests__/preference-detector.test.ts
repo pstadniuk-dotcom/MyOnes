@@ -112,6 +112,61 @@ describe("David Sica's feedback — rejected ingredient detection", () => {
   });
 });
 
+// Regression tests for Pete's bug (April 29, 2026): user said
+// "i dont want hawthorn berry or ginko, can you substitute something else
+//  same with cinnamon" and the AI re-included Hawthorn 50mg + Cinnamon 30mg
+// on the next regeneration because:
+//   1. "dont want" wasn't in REMOVE_VERBS
+//   2. "cinnamon" / "ginko" don't match catalog names
+//      "Cinnamon 20:1" / "Ginkgo Biloba Extract 24%"
+describe("Pete's bug — short-form names and apostrophe-less typing", () => {
+  it('catches "i dont want" (no apostrophe) plus shortened ingredient names', () => {
+    const result = detectRejectedIngredients(
+      'i dont want hawthorn berry or ginko, can you substitute something else same with cinnamon'
+    );
+    expect(result).toContain('Hawthorn Berry');
+    expect(result).toContain('Ginkgo Biloba Extract 24%');
+    expect(result).toContain('Cinnamon 20:1');
+  });
+
+  it('catches "I don\'t want X" with proper apostrophe', () => {
+    const result = detectRejectedIngredients("I don't want Cinnamon in my formula.");
+    expect(result).toContain('Cinnamon 20:1');
+  });
+
+  it('catches "do not want X"', () => {
+    const result = detectRejectedIngredients('I do not want Ginkgo or Hawthorn.');
+    expect(result).toContain('Ginkgo Biloba Extract 24%');
+    expect(result).toContain('Hawthorn Berry');
+  });
+
+  it('resolves "ginkgo" alias to canonical "Ginkgo Biloba Extract 24%"', () => {
+    const result = detectRejectedIngredients('Please remove ginkgo from my stack.');
+    expect(result).toContain('Ginkgo Biloba Extract 24%');
+  });
+
+  it('resolves "cinnamon" alias to canonical "Cinnamon 20:1"', () => {
+    const result = detectRejectedIngredients('Drop the cinnamon.');
+    expect(result).toContain('Cinnamon 20:1');
+  });
+
+  it('resolves "hawthorn" alias to canonical "Hawthorn Berry"', () => {
+    const result = detectRejectedIngredients('Remove hawthorn please.');
+    expect(result).toContain('Hawthorn Berry');
+  });
+
+  it('resolves common typo "ginko" to "Ginkgo Biloba Extract 24%"', () => {
+    const result = detectRejectedIngredients('skip the ginko');
+    expect(result).toContain('Ginkgo Biloba Extract 24%');
+  });
+
+  it('does NOT capture aliases when there is no removal verb', () => {
+    const result = detectRejectedIngredients('Tell me about cinnamon and ginkgo benefits.');
+    expect(result).not.toContain('Cinnamon 20:1');
+    expect(result).not.toContain('Ginkgo Biloba Extract 24%');
+  });
+});
+
 describe("David's feedback — focused stack mode detection", () => {
   it('detects "like AG1" from his actual message', () => {
     const result = detectFormulationModeChange(

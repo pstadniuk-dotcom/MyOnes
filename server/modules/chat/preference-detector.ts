@@ -36,9 +36,23 @@ const REMOVE_VERBS = [
   "don't include",
   "don't use",
   "don't put",
+  "don't want",
+  "don't need",
+  "don't like",
+  'dont add',        // common typo: missing apostrophe
+  'dont include',
+  'dont use',
+  'dont want',       // user said "i dont want hawthorn berry"
+  'dont need',
+  'dont like',
   'do not add',
   'do not include',
   'do not use',
+  'do not want',
+  'do not need',
+  'do not like',
+  'no thanks to',
+  'not interested in',
   'no more',
   'no ',
   'without ',
@@ -57,12 +71,90 @@ const ALL_INGREDIENT_NAMES: string[] = [
   .sort((a, b) => b.length - a.length);
 
 /**
+ * Build a map of common short forms / typos → canonical catalog name.
+ *
+ * Why: catalog names often carry suffixes the user doesn't type (e.g.
+ * "Cinnamon 20:1", "Ginkgo Biloba Extract 24%", "Hawthorn Berry").
+ * Without aliasing, a user saying "remove cinnamon" matches nothing
+ * and the rejection is silently dropped — and the AI / autoExpand
+ * keeps re-adding the ingredient on every regeneration.
+ *
+ * Strategy: for each catalog name, strip well-known trailing tokens
+ * (extract %, ratios, descriptors, plant parts) and register the
+ * shortened form as an alias. We only register the alias when it
+ * uniquely identifies a single catalog entry — otherwise we'd risk
+ * a false-positive blacklist.
+ */
+const SUFFIX_STRIP_PATTERNS: RegExp[] = [
+  /\s+extract\s+\d+%?$/i,        // "Ginkgo Biloba Extract 24%"
+  /\s+\d+:\d+$/,                  // "Cinnamon 20:1"
+  /\s+\d+%$/,                     // "X 95%"
+  /\s+(berry|root|leaf|bark|seed|fruit|powder|standardized|complex|extract)$/i,
+];
+
+// Curated typos / phonetic misspellings that automatic stripping won't
+// produce. Keep small and obvious — anything ambiguous belongs in a
+// proper fuzzy-match layer, not here.
+const MANUAL_ALIASES: Record<string, string> = {
+  ginko: 'Ginkgo Biloba Extract 24%',
+  ginkgo: 'Ginkgo Biloba Extract 24%',
+  'ginkgo biloba': 'Ginkgo Biloba Extract 24%',
+  'co q10': 'CoEnzyme Q10',
+  'coq10': 'CoEnzyme Q10',
+  'co-q10': 'CoEnzyme Q10',
+  'omega-3': 'Omega 3',
+  'omega 3': 'Omega 3',
+  'fish oil': 'Omega 3',
+};
+
+const INGREDIENT_ALIASES: Map<string, string> = (() => {
+  const map = new Map<string, string>();
+  // Track aliases that map to multiple canonical names → drop them.
+  const conflicts = new Set<string>();
+
+  const register = (alias: string, canonical: string) => {
+    const key = alias.toLowerCase().trim();
+    if (!key) return;
+    // Don't shadow an exact catalog name with itself.
+    if (key === canonical.toLowerCase()) return;
+    if (conflicts.has(key)) return;
+    const existing = map.get(key);
+    if (existing && existing !== canonical) {
+      conflicts.add(key);
+      map.delete(key);
+      return;
+    }
+    map.set(key, canonical);
+  };
+
+  for (const name of ALL_INGREDIENT_NAMES) {
+    let stripped = name;
+    for (const re of SUFFIX_STRIP_PATTERNS) {
+      const next = stripped.replace(re, '').trim();
+      if (next && next !== stripped) {
+        register(next, name);
+        stripped = next;
+      }
+    }
+  }
+
+  for (const [alias, canonical] of Object.entries(MANUAL_ALIASES)) {
+    // Manual aliases override automatic ones — they're explicit.
+    if (ALL_INGREDIENT_NAMES.includes(canonical)) {
+      map.set(alias.toLowerCase().trim(), canonical);
+    }
+  }
+
+  return map;
+})();
+
+/**
  * Find ingredient names mentioned anywhere in a chunk of text.
  * Returns canonical (catalog-cased) names.
  */
 function findMentionedIngredients(text: string): string[] {
   const lower = text.toLowerCase();
-  const found: string[] = [];
+  const found = new Set<string>();
   for (const name of ALL_INGREDIENT_NAMES) {
     const lcName = name.toLowerCase();
     const escaped = lcName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -74,10 +166,19 @@ function findMentionedIngredients(text: string): string[] {
     const endBoundary = /\w$/.test(lcName) ? '\\b' : '(?:$|\\W)';
     const pattern = new RegExp(`${startBoundary}${escaped}${endBoundary}`, 'i');
     if (pattern.test(lower)) {
-      found.push(name);
+      found.add(name);
     }
   }
-  return found;
+  // Also resolve aliases (short forms / typos) that didn't match above.
+  for (const [alias, canonical] of INGREDIENT_ALIASES) {
+    if (found.has(canonical)) continue;
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escaped}\\b`, 'i');
+    if (pattern.test(lower)) {
+      found.add(canonical);
+    }
+  }
+  return [...found];
 }
 
 /**
