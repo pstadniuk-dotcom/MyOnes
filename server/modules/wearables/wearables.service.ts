@@ -795,24 +795,158 @@ export class WearablesService {
         return { data };
     }
 
+    // In-memory rate limit for manual refresh (per user). Junction polls providers
+    // on its own schedule, so spamming this endpoint can't make Oura sync faster.
+    private lastManualSyncAt = new Map<string, number>();
+    private readonly MANUAL_SYNC_COOLDOWN_MS = 60 * 1000; // 60s
+
     async syncData(userId: string) {
         const junctionUserId = await wearablesRepository.getJunctionUserId(userId);
         if (!junctionUserId) {
             throw new Error('No wearables connected');
         }
 
+        const last = this.lastManualSyncAt.get(userId) ?? 0;
+        const sinceLast = Date.now() - last;
+        if (sinceLast < this.MANUAL_SYNC_COOLDOWN_MS) {
+            const retryAfterSec = Math.ceil((this.MANUAL_SYNC_COOLDOWN_MS - sinceLast) / 1000);
+            return {
+                success: false,
+                rateLimited: true,
+                retryAfterSec,
+                message: `Please wait ${retryAfterSec}s before refreshing again.`,
+                counts: { sleep: 0, activity: 0, body: 0 },
+            };
+        }
+        this.lastManualSyncAt.set(userId, Date.now());
+
         const endDate = new Date().toISOString().split('T')[0];
         const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        await Promise.all([
-            getSleepData(junctionUserId, startDate, endDate).catch(() => []),
-            getActivityData(junctionUserId, startDate, endDate).catch(() => []),
-            getBodyData(junctionUserId, startDate, endDate).catch(() => []),
+        const [sleepResult, activityResult, bodyResult] = await Promise.allSettled([
+            getSleepData(junctionUserId, startDate, endDate),
+            getActivityData(junctionUserId, startDate, endDate),
+            getBodyData(junctionUserId, startDate, endDate),
         ]);
 
+        const errors: string[] = [];
+        if (sleepResult.status === 'rejected') errors.push(`sleep: ${sleepResult.reason?.message ?? 'unknown'}`);
+        if (activityResult.status === 'rejected') errors.push(`activity: ${activityResult.reason?.message ?? 'unknown'}`);
+        if (bodyResult.status === 'rejected') errors.push(`body: ${bodyResult.reason?.message ?? 'unknown'}`);
+
+        const sleepData = sleepResult.status === 'fulfilled' ? sleepResult.value : [];
+        const activityData = activityResult.status === 'fulfilled' ? activityResult.value : [];
+        const bodyData = bodyResult.status === 'fulfilled' ? bodyResult.value : [];
+
+        const counts = { sleep: 0, activity: 0, body: 0 };
+
+        // Persist sleep — mirror webhook logic, including nap-skip rule so a manual
+        // refresh can't clobber a real night with a nap row.
+        for (const item of sleepData as any[]) {
+            try {
+                const dataDate = item?.calendar_date ? new Date(item.calendar_date) : null;
+                if (!dataDate) continue;
+
+                const sessionType = String(item?.type || item?.sleep_type || '').toLowerCase();
+                const totalMinutes = item?.duration_total_seconds
+                    ? Math.round(item.duration_total_seconds / 60)
+                    : (item?.total ? Math.round(item.total / 60) : 0);
+                const isNap = sessionType === 'early_nap' || sessionType === 'late_nap' || sessionType === 'nap' || sessionType === 'short_sleep';
+                const looksLikeNap = sessionType === '' && totalMinutes > 0 && totalMinutes < 180;
+                if (isNap || looksLikeNap) continue;
+
+                await wearablesRepository.saveJunctionBiometricData({
+                    userId,
+                    provider: item?.source?.slug || 'junction',
+                    dataDate,
+                    sleepScore: item?.sleep_score ?? item?.score ?? item?.sleep_efficiency ?? null,
+                    sleepHours: totalMinutes || null,
+                    deepSleepMinutes: item?.duration_deep_sleep_seconds
+                        ? Math.round(item.duration_deep_sleep_seconds / 60)
+                        : (item?.deep ? Math.round(item.deep / 60) : null),
+                    remSleepMinutes: item?.duration_rem_sleep_seconds
+                        ? Math.round(item.duration_rem_sleep_seconds / 60)
+                        : (item?.rem ? Math.round(item.rem / 60) : null),
+                    lightSleepMinutes: item?.duration_light_sleep_seconds
+                        ? Math.round(item.duration_light_sleep_seconds / 60)
+                        : (item?.light ? Math.round(item.light / 60) : null),
+                    hrvMs: item?.average_hrv ?? item?.hrv?.avg_hrv ?? null,
+                    restingHeartRate: item?.resting_heart_rate ?? item?.heart_rate?.resting_hr ?? null,
+                    respiratoryRate: item?.respiratory_rate ?? null,
+                    readinessScore: item?.readiness_score ?? null,
+                    rawData: item,
+                });
+                counts.sleep++;
+            } catch (e: any) {
+                logger.error('[Wearables] Manual sync sleep persist error', { error: e?.message });
+            }
+        }
+
+        for (const item of activityData as any[]) {
+            try {
+                const dataDate = item?.calendar_date ? new Date(item.calendar_date) : null;
+                if (!dataDate) continue;
+                await wearablesRepository.saveJunctionBiometricData({
+                    userId,
+                    provider: item?.source?.slug || 'junction',
+                    dataDate,
+                    steps: item?.steps ?? null,
+                    caloriesBurned: item?.calories_active ?? item?.calories_total ?? null,
+                    activeMinutes: item?.active_duration_seconds
+                        ? Math.round(item.active_duration_seconds / 60)
+                        : (item?.active_minutes ?? null),
+                    averageHeartRate: item?.heart_rate?.avg_hr ?? null,
+                    maxHeartRate: item?.heart_rate?.max_hr ?? null,
+                    rawData: item,
+                });
+                counts.activity++;
+            } catch (e: any) {
+                logger.error('[Wearables] Manual sync activity persist error', { error: e?.message });
+            }
+        }
+
+        for (const item of bodyData as any[]) {
+            try {
+                const dataDate = item?.calendar_date ? new Date(item.calendar_date) : null;
+                if (!dataDate) continue;
+                await wearablesRepository.saveJunctionBiometricData({
+                    userId,
+                    provider: item?.source?.slug || 'junction',
+                    dataDate,
+                    hrvMs: item?.hrv?.avg_hrv ?? item?.hrv_avg ?? null,
+                    restingHeartRate: item?.heart_rate?.resting_hr ?? item?.resting_heart_rate ?? null,
+                    averageHeartRate: item?.heart_rate?.avg_hr ?? null,
+                    maxHeartRate: item?.heart_rate?.max_hr ?? null,
+                    spo2Percentage: item?.oxygen_saturation ? Math.round(item.oxygen_saturation) : null,
+                    skinTempCelsius: item?.temperature ? Math.round(item.temperature * 10) : null,
+                    respiratoryRate: item?.respiratory_rate ? Math.round(item.respiratory_rate) : null,
+                    recoveryScore: item?.recovery_score ?? null,
+                    rawData: item,
+                });
+                counts.body++;
+            } catch (e: any) {
+                logger.error('[Wearables] Manual sync body persist error', { error: e?.message });
+            }
+        }
+
+        // Invalidate the Health Pulse cache so the dashboard reflects the refresh
+        // immediately on next read.
+        try { this.invalidatePulseCache(userId); } catch { /* noop */ }
+
+        const totalSaved = counts.sleep + counts.activity + counts.body;
+        const allFailed = errors.length === 3 && totalSaved === 0;
+
+        logger.info('[Wearables] Manual refresh complete', { userId, counts, errors });
+
         return {
-            success: true,
-            message: 'Data sync initiated via Junction',
+            success: !allFailed,
+            counts,
+            errors: errors.length > 0 ? errors : undefined,
+            message: totalSaved > 0
+                ? `Refreshed ${counts.sleep} sleep, ${counts.activity} activity, ${counts.body} body record${totalSaved === 1 ? '' : 's'}.`
+                : (allFailed
+                    ? 'Refresh failed. Junction may be temporarily unavailable.'
+                    : 'No new data available yet. Junction syncs from your device on its own schedule (typically 5–60 minutes after your device syncs).'),
         };
     }
 

@@ -568,26 +568,43 @@ export default function WearablesPage() {
     },
   });
 
-  // Sync mutation
+  // Refresh mutation — re-queries Junction for the last 7 days and persists
+  // any new rows. Junction itself decides when to pull from your device, so
+  // brand-new data (e.g. last night's sleep) may take 5–60 min to appear.
   const syncMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/wearables/sync');
-      return response.json();
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err: any = new Error(body?.message || body?.error || 'Refresh failed');
+        err.status = response.status;
+        err.payload = body;
+        throw err;
+      }
+      return body as {
+        success: boolean;
+        counts?: { sleep: number; activity: number; body: number };
+        message?: string;
+      };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/connections'] });
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse'] });
       queryClient.invalidateQueries({ queryKey: ['/api/wearables/health-pulse-intelligence'] });
+      const total = (result.counts?.sleep ?? 0) + (result.counts?.activity ?? 0) + (result.counts?.body ?? 0);
       toast({
-        title: 'Sync initiated',
-        description: 'Your wearable data is being synced.',
+        title: total > 0 ? 'Refreshed' : 'No new data yet',
+        description: result.message || (total > 0
+          ? `Updated ${total} record${total === 1 ? '' : 's'}.`
+          : 'Junction syncs from your device on its own schedule.'),
       });
     },
-    onError: () => {
+    onError: (err: any) => {
+      const isRateLimit = err?.status === 429;
       toast({
-        title: 'Sync failed',
-        description: 'Failed to sync data. Please try again.',
-        variant: 'destructive',
+        title: isRateLimit ? 'Slow down' : 'Refresh failed',
+        description: err?.message || 'Failed to refresh data. Please try again.',
+        variant: isRateLimit ? 'default' : 'destructive',
       });
     },
   });
@@ -813,7 +830,7 @@ export default function WearablesPage() {
               className="border-[#054700] text-[#054700]"
             >
               {syncMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              <span className="ml-1.5 hidden sm:inline">Sync</span>
+              <span className="ml-1.5 hidden sm:inline">Refresh</span>
             </Button>
             <Button
               size="sm"
@@ -1052,7 +1069,7 @@ export default function WearablesPage() {
                     <p className="text-[#5a6623] text-sm">No biometric data yet — sync your device or wait for the first automatic pull.</p>
                     <Button variant="outline" size="sm" className="mt-3 border-[#054700] text-[#054700]" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
                       {syncMutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
-                      Sync Now
+                      Refresh
                     </Button>
                   </div>
                 )}

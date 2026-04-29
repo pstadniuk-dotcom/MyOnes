@@ -20,6 +20,7 @@ import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
 import { detectRejectedIngredients, detectFormulationModeChange } from '../../modules/chat/preference-detector';
+import { extractRejectionsWithAI, shouldRunAIExtractor } from '../../modules/chat/preference-extractor-ai';
 import { mergeHealthArray } from '../../modules/users/health-data-merge';
 import { normalizeImageForVision } from '../../utils/fileAnalysis';
 import posthog from '../../infra/posthog';
@@ -408,13 +409,73 @@ export class ChatController {
             const newlyRejected = detectRejectedIngredients(message);
             const modeChange = detectFormulationModeChange(message);
 
+            // ── AI-based fallback for rejection intent ───────────────────────
+            // The regex above is fast and free but brittle — it only matches a
+            // closed set of removal verbs and exact catalog names. When the
+            // user phrases a removal in a way the regex misses ("i dont want
+            // hawthorn", "the cinnamon doesn't fit", "lose the ginger"), fall
+            // back to a small low-temp LLM call that interprets intent and
+            // returns canonical catalog names. NEVER throws — on any failure
+            // we proceed with the regex result alone.
+            let aiExtractedRejected: string[] = [];
+            if (shouldRunAIExtractor(message, newlyRejected.length)) {
+                try {
+                    // Use a small/cheap model regardless of the user's chat model.
+                    // Falls back to the configured provider's smallest available.
+                    const extractorModel = aiProvider === 'anthropic'
+                        ? 'claude-haiku-4-6'
+                        : 'gpt-4o-mini';
+                    // Keep ~500 chars of recent context so the AI can resolve
+                    // ambiguous pronouns ("remove those") against earlier turns.
+                    const recentContextSnippet = previousMessages
+                        .slice(-4)
+                        .map(m => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`)
+                        .join('\n')
+                        .slice(-1500);
+
+                    const aiResult = await extractRejectionsWithAI(
+                        {
+                            message,
+                            recentContext: recentContextSnippet || undefined,
+                            regexFoundCount: newlyRejected.length,
+                        },
+                        async ({ systemPrompt, userPrompt, timeoutMs }) =>
+                            chatService.complete({
+                                provider: aiProvider,
+                                model: extractorModel,
+                                systemPrompt,
+                                userPrompt,
+                                temperature: 0,
+                                maxTokens: 200,
+                                timeoutMs,
+                            }),
+                    );
+                    aiExtractedRejected = aiResult.rejected;
+                    if (aiResult.ranAI && aiResult.rejected.length > 0) {
+                        logger.info('AI preference extractor caught rejections regex missed', {
+                            userId,
+                            sessionId: chatSession.id,
+                            messageSnippet: message.substring(0, 200),
+                            extracted: aiResult.rejected,
+                        });
+                    }
+                } catch (extractorErr: any) {
+                    // Defensive — extractor itself catches errors but log if anything else throws.
+                    logger.warn('AI preference extractor wrapper threw', {
+                        userId,
+                        error: extractorErr?.message,
+                    });
+                }
+            }
+            const combinedNewlyRejected = Array.from(new Set([...newlyRejected, ...aiExtractedRejected]));
+
             const existingRejected: string[] = Array.isArray((chatSession as any).rejectedIngredients)
                 ? (chatSession as any).rejectedIngredients
                 : [];
-            const mergedRejected = Array.from(new Set([...existingRejected, ...newlyRejected]));
+            const mergedRejected = Array.from(new Set([...existingRejected, ...combinedNewlyRejected]));
 
             const prefsToPersist: { rejectedIngredients?: string[]; formulationMode?: string } = {};
-            if (newlyRejected.length > 0 && mergedRejected.length !== existingRejected.length) {
+            if (combinedNewlyRejected.length > 0 && mergedRejected.length !== existingRejected.length) {
                 prefsToPersist.rejectedIngredients = mergedRejected;
             }
             if (modeChange && modeChange !== ((chatSession as any).formulationMode || 'comprehensive')) {
@@ -427,7 +488,9 @@ export class ChatController {
                         logger.info('Session rejected-ingredients updated', {
                             userId,
                             sessionId: chatSession.id,
-                            newlyRejected,
+                            newlyRejected: combinedNewlyRejected,
+                            fromRegex: newlyRejected,
+                            fromAI: aiExtractedRejected,
                             totalRejected: mergedRejected,
                         });
                     }

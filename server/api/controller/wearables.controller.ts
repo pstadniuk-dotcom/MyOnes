@@ -146,6 +146,9 @@ export class WearablesController {
         try {
             const userId = req.userId!;
             const result = await wearablesService.syncData(userId);
+            if ((result as any).rateLimited) {
+                return res.status(429).json(result);
+            }
             res.json(result);
         } catch (error: any) {
             logger.error('Error in manual sync:', error);
