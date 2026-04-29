@@ -163,7 +163,7 @@ export default function HomePage() {
         {/* Profile Completeness — primary action card */}
         <Card
           data-testid="card-profile-completeness"
-          className="border-[#054700]/15 bg-gradient-to-br from-[#054700]/[0.03] to-transparent shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ring-1 ring-[#054700]/[0.06]"
+          className="min-w-0 border-[#054700]/15 bg-gradient-to-br from-[#054700]/[0.03] to-transparent shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer ring-1 ring-[#054700]/[0.06]"
           onClick={() => setShowProfileDialog(true)}
         >
           <CardContent className="p-4 md:pt-5 md:px-6">
@@ -183,7 +183,7 @@ export default function HomePage() {
         </Card>
 
         {/* Formula Version */}
-        <Card data-testid="card-formula-version" className="border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat?new=true')}>
+        <Card data-testid="card-formula-version" className="min-w-0 border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate(currentFormula ? '/dashboard/formula' : '/dashboard/chat?new=true')}>
           <CardContent className="p-4 md:pt-5 md:px-6">
             {currentFormula ? (
               <div className="flex items-center justify-between gap-3 md:flex-col md:items-start">
@@ -213,7 +213,7 @@ export default function HomePage() {
         </Card>
 
         {/* Consultations */}
-        <Card data-testid="card-consultations" className="border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate('/dashboard/chat?new=true')}>
+        <Card data-testid="card-consultations" className="min-w-0 border-[#054700]/8 shadow-[0_1px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer" onClick={() => navigate('/dashboard/chat?new=true')}>
           <CardContent className="p-4 md:pt-5 md:px-6">
             <div className="flex items-center justify-between gap-4 md:flex-col md:items-start">
               <div className="flex-1 min-w-0">
