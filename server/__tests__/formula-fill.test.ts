@@ -18,13 +18,13 @@ describe('Pete formula 4899mg underfill fix', () => {
         { ingredient: 'Ginkgo Biloba Extract 24%', amount: 240, unit: 'mg' },
         { ingredient: 'Ashwagandha', amount: 300, unit: 'mg' },
         { ingredient: 'Ginger Root', amount: 250, unit: 'mg' },
-        { ingredient: 'Garlic', amount: 200, unit: 'mg' },
+        { ingredient: 'Garlic', amount: 300, unit: 'mg' },
       ],
-      totalMg: 4899,
+      totalMg: 4999,
     };
 
     const startTotal = [...formula.bases, ...formula.additions].reduce((s: number, i: any) => s + i.amount, 0);
-    expect(startTotal).toBe(4899);
+    expect(startTotal).toBe(4999);
 
     // Run pipeline (same order as chat.controller.ts)
     autoFitFormulaToBudget(formula);
@@ -55,13 +55,13 @@ describe('Pete formula 4899mg underfill fix', () => {
         { ingredient: 'Omega 3', amount: 500, unit: 'mg' },
         { ingredient: 'Ashwagandha', amount: 300, unit: 'mg' },
         { ingredient: 'Curcumin', amount: 400, unit: 'mg' },
-        { ingredient: 'Maca', amount: 400, unit: 'mg' },
+        { ingredient: 'Maca', amount: 500, unit: 'mg' },
         { ingredient: 'Ginger Root', amount: 250, unit: 'mg' },
         { ingredient: 'CoEnzyme Q10', amount: 200, unit: 'mg' },
-        { ingredient: 'Garlic', amount: 150, unit: 'mg' },
+        { ingredient: 'Garlic', amount: 300, unit: 'mg' },
         { ingredient: 'Ginkgo Biloba Extract 24%', amount: 120, unit: 'mg' },
       ],
-      totalMg: 2740,
+      totalMg: 2990,
     };
 
     autoFitFormulaToBudget(formula);
@@ -91,11 +91,11 @@ describe('Pete formula 4899mg underfill fix', () => {
         { ingredient: 'Curcumin', amount: 500, unit: 'mg' },
         { ingredient: 'Ashwagandha', amount: 500, unit: 'mg' },
         { ingredient: 'Ginger Root', amount: 400, unit: 'mg' },
-        { ingredient: 'Garlic', amount: 200, unit: 'mg' },
+        { ingredient: 'Garlic', amount: 300, unit: 'mg' },
         { ingredient: 'Ginkgo Biloba Extract 24%', amount: 240, unit: 'mg' },
         { ingredient: 'Aloe Vera', amount: 200, unit: 'mg' },
       ],
-      totalMg: 5749,
+      totalMg: 5849,
     };
 
     autoFitFormulaToBudget(formula);

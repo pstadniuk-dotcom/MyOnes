@@ -191,8 +191,8 @@ function runPipeline(input: TestFormula) {
   expect(initialValidation.isValid).toBe(true);
 
   formula.totalMg = initialValidation.calculatedTotalMg;
-  autoExpandFormula(formula);
   autoFitFormulaToBudget(formula);
+  autoExpandFormula(formula);
 
   const finalValidation = validateAndCalculateFormula(formula);
   formula.totalMg = finalValidation.calculatedTotalMg;

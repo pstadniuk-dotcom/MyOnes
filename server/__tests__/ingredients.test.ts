@@ -112,9 +112,9 @@ describe('Ingredient Dosing', () => {
   });
 
   it('should return correct dose for individual ingredients', () => {
-    // Ashwagandha default dose is 50mg (range 50-600)
+    // Ashwagandha default dose is 125mg (range 125-600, clinical KSM-66 minimum)
     const ashwagandhaDose = getIngredientDose('Ashwagandha');
-    expect(ashwagandhaDose).toBe(50);
+    expect(ashwagandhaDose).toBe(125);
 
     // CoQ10 is actually named "CoEnzyme Q10" in the catalog
     const coq10Dose = getIngredientDose('CoEnzyme Q10');

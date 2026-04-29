@@ -268,13 +268,16 @@ export function autoExpandFormula(formula: any, rejectedIngredients: string[] = 
 
     let remainingBudget = maxWithTolerance - currentTotal;
 
+    // Filler suggestions — minDose/normalDose are hints; actual values are clamped
+    // against the catalog's authoritative doseRangeMin/doseRangeMax via
+    // get*AllowedDoseForIngredient() below.
     const fillerIngredients = [
-        { name: 'Garlic', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Supports cardiovascular health and healthy cholesterol levels through allicin and sulfur compounds.' },
-        { name: 'Resveratrol', minDose: 50, normalDose: 150, unit: 'mg', purpose: 'Provides antioxidant support for endothelial function and healthy aging.' },
-        { name: 'Ginkgo Biloba Extract 24%', minDose: 40, normalDose: 120, unit: 'mg', purpose: 'Supports circulation and cognitive function through improved blood flow.' },
-        { name: 'Ginger Root', minDose: 75, normalDose: 150, unit: 'mg', purpose: 'Supports digestion, reduces inflammation, and aids metabolic function.' },
-        { name: 'CoEnzyme Q10', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Supports mitochondrial energy production and cardiovascular health.' },
-        { name: 'Hawthorn Berry', minDose: 50, normalDose: 100, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
+        { name: 'Garlic', minDose: 300, normalDose: 600, unit: 'mg', purpose: 'Supports cardiovascular health and healthy cholesterol levels through allicin and sulfur compounds.' },
+        { name: 'Resveratrol', minDose: 75, normalDose: 200, unit: 'mg', purpose: 'Provides antioxidant support for endothelial function and healthy aging.' },
+        { name: 'Ginkgo Biloba Extract 24%', minDose: 120, normalDose: 120, unit: 'mg', purpose: 'Supports circulation and cognitive function through improved blood flow.' },
+        { name: 'Ginger Root', minDose: 250, normalDose: 500, unit: 'mg', purpose: 'Supports digestion, reduces inflammation, and aids metabolic function.' },
+        { name: 'CoEnzyme Q10', minDose: 30, normalDose: 100, unit: 'mg', purpose: 'Supports mitochondrial energy production and cardiovascular health.' },
+        { name: 'Hawthorn Berry', minDose: 160, normalDose: 300, unit: 'mg', purpose: 'Traditional cardiovascular support for heart muscle function and blood pressure.' },
         { name: 'Cinnamon 20:1', minDose: 30, normalDose: 100, unit: 'mg', purpose: 'Supports healthy blood sugar metabolism and insulin sensitivity.' },
         { name: 'Magnesium', minDose: 100, normalDose: 200, unit: 'mg', purpose: 'Essential mineral for muscle relaxation, energy production, and nervous system function.' },
     ].filter(f => !rejectedIngredients.some(r => r.toLowerCase().trim() === f.name.toLowerCase()));
