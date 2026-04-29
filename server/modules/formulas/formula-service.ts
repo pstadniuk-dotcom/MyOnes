@@ -467,6 +467,35 @@ export function autoExpandFormula(formula: any, rejectedIngredients: string[] = 
     return { expanded: addedIngredients.length > 0, addedIngredients };
 }
 
+/**
+ * Defensive last-mile clamp. Brings every ingredient amount inside its
+ * approved [min, max] range and recomputes totalMg. Existing callers
+ * (validateAndCorrectIngredientNames, formula-expander) already clamp at
+ * their boundaries, but this guards against any future code path that
+ * mutates a formula without going through them. Returns an array of
+ * human-readable adjustment notes for SSE/log surfacing.
+ */
+export function clampIngredientDosesToRange(formula: any): string[] {
+    const notes: string[] = [];
+    const all = [...(formula.bases || []), ...(formula.additions || [])];
+    for (const ing of all) {
+        if (!ing || typeof ing.amount !== 'number') continue;
+        const minAllowed = getMinAllowedDoseForIngredient(ing.ingredient);
+        const maxAllowed = getMaxAllowedDoseForIngredient(ing.ingredient);
+        const original = ing.amount;
+        const clamped = Math.min(maxAllowed, Math.max(minAllowed, Math.round(original)));
+        if (clamped !== original) {
+            ing.amount = clamped;
+            notes.push(`Adjusted ${ing.ingredient} from ${original}mg to ${clamped}mg (clinical range ${minAllowed}-${maxAllowed}mg).`);
+        }
+    }
+    if (notes.length > 0) {
+        formula.totalMg = [...(formula.bases || []), ...(formula.additions || [])]
+            .reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
+    }
+    return notes;
+}
+
 export function validateFormulaLimits(formula: any): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
     const targetCapsules = formula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;

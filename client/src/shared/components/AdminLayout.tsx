@@ -91,7 +91,7 @@ const navSections: { label?: string; items: NavItem[] }[] = [
           { label: 'Content', href: '/admin/content' },
         ],
       },
-      { label: 'Outreach Agent', href: '/admin/outreach', icon: Target },
+      { label: 'Prospector', href: '/admin/outreach', icon: Target },
       { label: 'Influencer Hub', href: '/admin/influencers', icon: Crown },
       { label: 'Social Studio', href: '/admin/social', icon: Megaphone },
       { label: 'UGC Studio', href: '/admin/ugc-studio', icon: Video },

@@ -13,7 +13,7 @@ import { aiRuntimeSettings, normalizeModel } from '../../infra/ai/ai-config';
 import { buildO1MiniPrompt, type PromptContext } from '../../utils/prompt-builder';
 import { analyzeQueryIntent } from '../../utils/query-intent-analyzer';
 import { canonicalKey } from '../../modules/labs/biomarker-aliases';
-import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula } from '../../modules/formulas/formula-service';
+import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula, clampIngredientDosesToRange } from '../../modules/formulas/formula-service';
 import { expandFormulaWithAI, buildClinicalContextSummary } from '../../modules/chat/formula-expander';
 import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
@@ -860,6 +860,20 @@ export class ChatController {
                             type: 'info',
                             message: `Added ${expansion.addedIngredients.length} clinically compatible ingredient${expansion.addedIngredients.length === 1 ? '' : 's'} to meet minimum protocol depth.`
                         });
+                    }
+
+                    // Defensive last-mile clamp: if any ingredient is still
+                    // outside its clinical range (e.g. AI expansion slipped
+                    // through with a sub-clinical dose), pull it inside the
+                    // range before final validation. This prevents raw
+                    // "Formula validation failed" errors reaching the user.
+                    const clampNotes = clampIngredientDosesToRange(validatedFormula);
+                    if (clampNotes.length > 0) {
+                        clampNotes.forEach(note => sendSSE({ type: 'info', message: note }));
+                        // Re-fit if clamping pushed totals over budget.
+                        if (validatedFormula.totalMg > maxWithTolerance) {
+                            autoFitFormulaToBudget(validatedFormula);
+                        }
                     }
 
                     const finalChecks = validateFormulaLimits(validatedFormula);

@@ -6,6 +6,7 @@ import { generateSocialPosts, generateContentIdeas, generateSocialImage, type Ge
 import { uploadBrandAsset, listBrandAssets, deleteBrandAsset, analyzeBrandStyle, getBrandStyleProfile } from '../../utils/brandAssetService';
 import { logger } from '../../infra/logging/logger';
 import type { UploadedFile } from 'express-fileupload';
+import * as fs from 'fs';
 import crmRoutes from '../../modules/crm/crm.routes';
 
 const router = Router();
@@ -264,7 +265,15 @@ router.post('/social/brand-assets', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid category. Must be one of: ${validCategories.join(', ')}` });
     }
     const description = typeof req.body.description === 'string' ? req.body.description.slice(0, 500) : undefined;
-    const asset = await uploadBrandAsset(file.data, file.name, file.mimetype, category, description);
+    // Global fileUpload middleware uses temp files (useTempFiles: true), so file.data
+    // is empty and the bytes live on disk at tempFilePath. Fall back when needed.
+    const fileBuffer = (file.data && file.data.length > 0)
+      ? file.data
+      : (file.tempFilePath ? fs.readFileSync(file.tempFilePath) : Buffer.alloc(0));
+    if (fileBuffer.length === 0) {
+      return res.status(400).json({ error: 'Uploaded file is empty.' });
+    }
+    const asset = await uploadBrandAsset(fileBuffer, file.name, file.mimetype, category, description);
     return res.json({ success: true, asset });
   } catch (err: any) {
     logger.error('[brand-assets] upload error', { error: err.message });

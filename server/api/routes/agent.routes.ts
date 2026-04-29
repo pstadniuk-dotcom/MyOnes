@@ -67,11 +67,15 @@ import {
   deleteProspectContact,
   triggerRedraftAll,
 } from '../controller/agent.controller';
+import { prospectorChatStream } from '../controller/prospector-chat.controller';
 
 const router = Router();
 
 // All routes require admin access
 router.use(requireAdmin);
+
+// Conversational Prospector (SSE streaming chat)
+router.post('/chat', prospectorChatStream);
 
 // Dashboard
 router.get('/dashboard', getAgentDashboard);

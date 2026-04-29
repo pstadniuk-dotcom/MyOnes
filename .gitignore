@@ -32,3 +32,5 @@ test-dev-db.mjs
 check-deployment.mjs
 .vercel
 audit-output.log
+preview-*.txt
+coding-session-*.md

@@ -1011,9 +1011,19 @@ export class UgcController {
         return res.status(400).json({ error: 'Only image files are allowed (jpg, png, webp, gif)' });
       }
 
+      // Global fileUpload middleware uses temp files (useTempFiles: true), so file.data
+      // is empty and the bytes live on disk at tempFilePath. Fall back when needed.
+      const fs = await import('fs');
+      const fileBuffer = (file.data && file.data.length > 0)
+        ? file.data
+        : (file.tempFilePath ? fs.readFileSync(file.tempFilePath) : Buffer.alloc(0));
+      if (fileBuffer.length === 0) {
+        return res.status(400).json({ error: 'Uploaded file is empty.' });
+      }
+
       // Upload buffer to Supabase
       const { uploadBufferToSupabase: uploadBuf } = await import('../../utils/ugcService');
-      const permanentUrl = await uploadBuf(file.data, 'brand-asset', file.mimetype);
+      const permanentUrl = await uploadBuf(fileBuffer, 'brand-asset', file.mimetype);
 
       const [asset] = await db.insert(ugcBrandAssets).values({
         campaignId: campaignId || null,

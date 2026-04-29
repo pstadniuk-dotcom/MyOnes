@@ -71,6 +71,7 @@ const IngredientSyncPage = lazy(() => import("@/pages/admin/IngredientSyncPage")
 
 const AIUsagePage = lazy(() => import("@/pages/admin/AIUsagePage"));
 const PRAgentPage = lazy(() => import("@/pages/admin/PRAgentPage"));
+const ProspectorPage = lazy(() => import("@/pages/admin/ProspectorPage"));
 
 const TrafficSourcesPage = lazy(() => import("@/pages/admin/TrafficSourcesPage"));
 const InfluencerHubPage = lazy(() => import("@/pages/admin/InfluencerHubPage"));
@@ -382,6 +383,13 @@ function MainRouter() {
       <Route path="/admin/outreach">
         <ProtectedAdminRoute>
           <AdminLayout>
+            <Suspense fallback={<PageLoader />}><ProspectorPage /></Suspense>
+          </AdminLayout>
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/pr-agent/legacy">
+        <ProtectedAdminRoute>
+          <AdminLayout>
             <Suspense fallback={<PageLoader />}><PRAgentPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
@@ -389,7 +397,7 @@ function MainRouter() {
       <Route path="/admin/pr-agent">
         <ProtectedAdminRoute>
           <AdminLayout>
-            <Suspense fallback={<PageLoader />}><PRAgentPage /></Suspense>
+            <Suspense fallback={<PageLoader />}><ProspectorPage /></Suspense>
           </AdminLayout>
         </ProtectedAdminRoute>
       </Route>

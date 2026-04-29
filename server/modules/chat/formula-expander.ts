@@ -241,10 +241,40 @@ export function parseAndValidateExpansion(
             continue;
         }
 
+        // Clamp amount to ingredient's allowed dose range. The AI sometimes
+        // returns sub-clinical doses (e.g. 52mg Phosphatidylcholine when the
+        // floor is 300mg). Without this clamp, downstream validateFormulaLimits
+        // would error and the user sees a raw "Formula validation failed"
+        // message. Mirror the clamp applied in validateAndCorrectIngredientNames.
+        const support = SYSTEM_SUPPORTS.find(s => s.name === canonical);
+        const individual = INDIVIDUAL_INGREDIENTS.find(i => i.name === canonical);
+        let clampedAmount = Math.round(amount);
+        if (support) {
+            const baseDose = support.doseMg;
+            const allowedMultipliers = [1, 2, 3];
+            const closestMultiplier = allowedMultipliers.reduce((closest, candidate) =>
+                Math.abs(baseDose * candidate - clampedAmount) < Math.abs(baseDose * closest - clampedAmount)
+                    ? candidate
+                    : closest
+            , 1);
+            clampedAmount = baseDose * closestMultiplier;
+        } else if (individual) {
+            const minAllowed = typeof individual.doseRangeMin === 'number'
+                ? individual.doseRangeMin
+                : (typeof individual.doseMg === 'number' ? individual.doseMg : 10);
+            const maxAllowed = typeof individual.doseRangeMax === 'number'
+                ? individual.doseRangeMax
+                : (typeof individual.doseMg === 'number' ? individual.doseMg : 1000);
+            clampedAmount = Math.min(maxAllowed, Math.max(minAllowed, clampedAmount));
+        }
+        if (clampedAmount !== Math.round(amount)) {
+            warnings.push(`Adjusted ${canonical} dose from ${Math.round(amount)}mg to ${clampedAmount}mg to fit clinical range.`);
+        }
+
         seen.add(lc);
         valid.push({
             ingredient: canonical,
-            amount,
+            amount: clampedAmount,
             unit,
             purpose: purpose || `AI-selected to complete capsule budget for this user's profile.`,
             source: 'ai-fill',

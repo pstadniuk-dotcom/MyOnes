@@ -6,6 +6,7 @@ import logger from '../../infra/logging/logger';
 import { z } from 'zod';
 import { scanSupplementLabel } from '../../utils/fileAnalysis';
 import type { UploadedFile } from 'express-fileupload';
+import * as fs from 'fs';
 
 export class UsersController {
     async getCurrentFormula(req: Request, res: Response) {
@@ -141,7 +142,7 @@ export class UsersController {
 
             // express-fileupload sets req.files.image as a single UploadedFile or array
             const raw = Array.isArray(req.files.image) ? req.files.image[0] : (req.files.image as UploadedFile);
-            if (!raw || !raw.data || raw.data.length === 0) {
+            if (!raw) {
                 return res.status(400).json({ error: 'Uploaded file is empty.' });
             }
 
@@ -153,8 +154,19 @@ export class UsersController {
                 return res.status(400).json({ error: 'Image too large (max 12MB).' });
             }
 
+            // The global fileUpload middleware uses temp files (useTempFiles: true),
+            // so raw.data is an empty Buffer and the bytes live on disk at tempFilePath.
+            // Fall back to the in-memory buffer for any callers that change that config.
+            const fileBuffer = (raw.data && raw.data.length > 0)
+                ? raw.data
+                : (raw.tempFilePath ? fs.readFileSync(raw.tempFilePath) : Buffer.alloc(0));
+
+            if (fileBuffer.length === 0) {
+                return res.status(400).json({ error: 'Uploaded file is empty.' });
+            }
+
             logger.info('Scanning supplement label', { userId, mime: raw.mimetype, size: raw.size });
-            const result = await scanSupplementLabel(raw.data, raw.mimetype);
+            const result = await scanSupplementLabel(fileBuffer, raw.mimetype);
             logger.info('Supplement label scan complete', {
                 userId,
                 productName: result.productName,
