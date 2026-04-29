@@ -218,8 +218,18 @@ export function autoFitFormulaToBudget(formula: any): {
         const toRemove = new Set<number>();
         let overage = newTotalMg - maxAllowedMg;
 
+        // Count-preservation guard: keep enough additions so the formula
+        // still meets the minimum ingredient count for its capsule tier.
+        // Otherwise autoExpand has to backfill with generic filler — losing
+        // the clinically-chosen ingredients the AI selected for this user.
+        const minIngredientCount = getMinIngredientCountForCapsules(targetCapsules);
+        const baseCount = (formula.bases || []).length;
+        const minAdditionsToKeep = Math.max(0, minIngredientCount - baseCount);
+        const maxRemovable = Math.max(0, formula.additions.length - minAdditionsToKeep);
+
         for (const candidate of sortedByAmount) {
             if (overage <= 0) break;
+            if (toRemove.size >= maxRemovable) break;
             if (!candidate.item?.ingredient) continue;
             toRemove.add(candidate.index);
             removedIngredients.push(candidate.item.ingredient);
@@ -479,19 +489,38 @@ export function clampIngredientDosesToRange(formula: any): string[] {
     const notes: string[] = [];
     const all = [...(formula.bases || []), ...(formula.additions || [])];
     for (const ing of all) {
-        if (!ing || typeof ing.amount !== 'number') continue;
+        if (!ing) continue;
+        // Guard against NaN/Infinity/non-numeric amounts. AI sometimes returns
+        // strings or string-numbers; reject anything that won't behave like a
+        // safe number and force it to the ingredient's clinical minimum so
+        // downstream validation has something defensible to work with.
+        const rawAmount = ing.amount;
+        const numericAmount = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount);
+        if (!Number.isFinite(numericAmount)) {
+            const fallback = getMinAllowedDoseForIngredient(ing.ingredient);
+            logger.warn('Non-finite ingredient amount detected during clamp', {
+                ingredient: ing.ingredient,
+                rawAmount,
+                fallback,
+            });
+            ing.amount = fallback;
+            notes.push(`Could not parse amount for ${ing.ingredient}; defaulted to ${fallback}mg.`);
+            continue;
+        }
         const minAllowed = getMinAllowedDoseForIngredient(ing.ingredient);
         const maxAllowed = getMaxAllowedDoseForIngredient(ing.ingredient);
-        const original = ing.amount;
-        const clamped = Math.min(maxAllowed, Math.max(minAllowed, Math.round(original)));
-        if (clamped !== original) {
+        const clamped = Math.min(maxAllowed, Math.max(minAllowed, Math.round(numericAmount)));
+        if (clamped !== numericAmount) {
             ing.amount = clamped;
-            notes.push(`Adjusted ${ing.ingredient} from ${original}mg to ${clamped}mg (clinical range ${minAllowed}-${maxAllowed}mg).`);
+            notes.push(`Adjusted ${ing.ingredient} from ${numericAmount}mg to ${clamped}mg (clinical range ${minAllowed}-${maxAllowed}mg).`);
+        } else if (clamped !== rawAmount) {
+            // Coerce string-number into actual number even when no clamp needed.
+            ing.amount = clamped;
         }
     }
     if (notes.length > 0) {
         formula.totalMg = [...(formula.bases || []), ...(formula.additions || [])]
-            .reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
+            .reduce((sum: number, i: any) => sum + (Number.isFinite(i.amount) ? i.amount : 0), 0);
     }
     return notes;
 }
@@ -551,12 +580,20 @@ export function isAnyIngredientApproved(name: string): boolean {
 export function parseDoseToMg(doseStr: string, ingredientName: string): number {
     if (!doseStr) return 0;
     const match = doseStr.match(/(\d+(?:\.\d+)?)\s*(mg|g|mcg)?/i);
-    if (!match) return 0;
+    if (!match) {
+        logger.warn('parseDoseToMg could not parse dose string', { doseStr, ingredientName });
+        return 0;
+    }
     let val = parseFloat(match[1]);
+    if (!Number.isFinite(val)) {
+        logger.warn('parseDoseToMg parsed non-finite value', { doseStr, ingredientName, parsed: val });
+        return 0;
+    }
     const unit = (match[2] || 'mg').toLowerCase();
     if (unit === 'g') val *= 1000;
     if (unit === 'mcg') val /= 1000;
-    return Math.round(val);
+    const rounded = Math.round(val);
+    return Number.isFinite(rounded) ? rounded : 0;
 }
 
 export function validateAndCalculateFormula(formula: any) {
@@ -682,231 +719,6 @@ export function validateAndCorrectIngredientNames(formula: any) {
         warnings,
         errors
     };
-}
-
-/**
- * @deprecated Use validateFormulaSafety from safety-validator.ts instead.
- * This function is superseded by the structured SafetyWarning system which provides
- * severity-tiered enforcement (critical/serious/informational) and sub-ingredient expansion.
- * Kept as dead code reference — safe to remove entirely.
- */
-export async function validateSupplementInteractions(formula: any, userMedications: string[]): Promise<string[]> {
-    const warnings: string[] = [];
-    const allIngredients = [...(formula.bases || []), ...(formula.additions || [])].map((i: any) => (i.ingredient || '').toLowerCase());
-
-    // Helper: check if any user medication matches any drug keyword
-    const has = (meds: string[], drugList: string[]) =>
-        meds.some(m => drugList.some(d => m.includes(d)));
-    // Helper: check if any formula ingredient matches any supplement keyword
-    const hasIngr = (keywords: string[]) =>
-        allIngredients.some(i => keywords.some(k => i.includes(k)));
-    // Helper: collect matching ingredient names for the warning message
-    const matchingIngr = (keywords: string[]) => {
-        const matches = new Set<string>();
-        for (const i of allIngredients) {
-            for (const k of keywords) {
-                if (i.includes(k)) matches.add(i);
-            }
-        }
-        return [...matches];
-    };
-
-    // ── Antiplatelet stacking check (no medication needed) ──────────────
-    const antiplateletKeywords = ['omega', 'fish oil', 'garlic', 'ginger', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
-    const antiplateletMatches = matchingIngr(antiplateletKeywords);
-    if (antiplateletMatches.length >= 3) {
-        warnings.push(`Your formula stacks ${antiplateletMatches.length} ingredients with antiplatelet/anticoagulant activity (${antiplateletMatches.join(', ')}). This may increase bleeding risk even without a blood thinner — discuss with your physician.`);
-    }
-
-    // Early exit if no medications disclosed
-    if (!userMedications || userMedications.length === 0) {
-        if (allIngredients.length > 0) {
-            warnings.push('If you take any prescription medications, consult your physician or pharmacist before starting this formula.');
-        }
-        return warnings;
-    }
-
-    const medsLower = userMedications.map(m => m.toLowerCase());
-
-    // ── 1. Anticoagulants / Blood Thinners ──────────────────────────────
-    const bloodThinners = ['warfarin', 'coumadin', 'clopidogrel', 'plavix', 'aspirin', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'heparin', 'enoxaparin'];
-    const btSupplements = ['omega', 'fish oil', 'garlic', 'ginger', 'ginkgo', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
-    if (has(medsLower, bloodThinners) && hasIngr(btSupplements)) {
-        const found = matchingIngr(btSupplements);
-        warnings.push(`Contains ${found.join(', ')} which may increase bleeding risk with your blood thinner. Consult your physician.`);
-    }
-
-    // ── 2. Antidepressants / Psychiatric Medications ────────────────────
-    const ssriSnri = ['sertraline', 'zoloft', 'fluoxetine', 'prozac', 'escitalopram', 'lexapro', 'citalopram', 'paroxetine', 'paxil', 'venlafaxine', 'effexor', 'duloxetine', 'cymbalta', 'bupropion', 'wellbutrin', 'maoi', 'phenelzine', 'tranylcypromine', 'lithium', 'quetiapine', 'seroquel'];
-    const ssriSupplements = ["st. john's wort", 'st john', '5-htp', 'same', 'tryptophan', 'gaba', 'rhodiola', 'ashwagandha'];
-    if (has(medsLower, ssriSnri)) {
-        // Absolute contraindication: St. John's Wort
-        if (hasIngr(["st. john", "st john"])) {
-            warnings.push("CRITICAL: St. John's Wort must NEVER be combined with antidepressants — risk of serotonin syndrome. Remove immediately.");
-        }
-        const otherPsych = ssriSupplements.filter(s => !s.includes('st john'));
-        if (hasIngr(otherPsych)) {
-            const found = matchingIngr(otherPsych);
-            warnings.push(`Contains ${found.join(', ')} which may interact with your psychiatric medication. Discuss with your prescribing clinician.`);
-        }
-    }
-
-    // ── 3. Thyroid Medications ──────────────────────────────────────────
-    const thyroidMeds = ['levothyroxine', 'synthroid', 'tirosint', 'liothyronine', 'cytomel', 'armour thyroid'];
-    const thyroidSupplements = ['thyroid support', 'ashwagandha', 'iodine', 'kelp', 'seaweed', 'selenium', 'zinc'];
-    if (has(medsLower, thyroidMeds) && hasIngr(thyroidSupplements)) {
-        const found = matchingIngr(thyroidSupplements);
-        warnings.push(`Contains ${found.join(', ')} which may affect thyroid function while on thyroid medication. Take supplements 4+ hours apart from thyroid meds. Coordinate with your clinician.`);
-    }
-
-    // ── 4. Diabetes / Blood Sugar Medications ───────────────────────────
-    const diabetesMeds = ['metformin', 'insulin', 'glipizide', 'glyburide', 'semaglutide', 'ozempic', 'wegovy', 'tirzepatide', 'mounjaro', 'sitagliptin', 'januvia', 'empagliflozin', 'jardiance', 'dapagliflozin', 'canagliflozin'];
-    const diabetesSupplements = ['berberine', 'cinnamon', 'chromium', 'alpha lipoic', 'innoslim', 'bitter melon', 'gymnema'];
-    if (has(medsLower, diabetesMeds) && hasIngr(diabetesSupplements)) {
-        const found = matchingIngr(diabetesSupplements);
-        warnings.push(`Contains ${found.join(', ')} which may lower blood glucose alongside your diabetes medication. Monitor for hypoglycemia.`);
-    }
-
-    // ── 5. Blood Pressure Medications ───────────────────────────────────
-    const bpMeds = ['lisinopril', 'amlodipine', 'metoprolol', 'losartan', 'valsartan', 'hydrochlorothiazide', 'carvedilol', 'verapamil', 'diltiazem', 'enalapril', 'ramipril'];
-    const bpSupplements = ['magnesium', 'coq10', 'hawthorn', 'garlic', 'omega', 'potassium'];
-    if (has(medsLower, bpMeds) && hasIngr(bpSupplements)) {
-        const found = matchingIngr(bpSupplements);
-        warnings.push(`Contains ${found.join(', ')} which may further lower blood pressure with your antihypertensive medication. Monitor blood pressure closely.`);
-    }
-
-    // ── 6. Immunosuppressants / Transplant Medications ──────────────────
-    const immunoMeds = ['cyclosporine', 'tacrolimus', 'mycophenolate', 'prednisone', 'methotrexate', 'azathioprine', 'sirolimus'];
-    const immunoSupplements = ["st. john", "st john", 'echinacea', 'milk thistle', 'astragalus', 'elderberry', 'mushroom'];
-    if (has(medsLower, immunoMeds)) {
-        if (hasIngr(["st. john", "st john"])) {
-            warnings.push("CRITICAL: St. John's Wort dramatically reduces immunosuppressant drug levels — this is life-threatening for transplant patients. Remove immediately.");
-        }
-        if (hasIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom'])) {
-            const found = matchingIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom']);
-            warnings.push(`Contains immune-stimulating ingredients (${found.join(', ')}) which are contraindicated with immunosuppressant therapy. Consult your physician.`);
-        }
-        if (hasIngr(['milk thistle'])) {
-            warnings.push('Milk Thistle may alter CYP3A4 enzyme activity, affecting immunosuppressant drug levels. Physician review required.');
-        }
-    }
-
-    // ── 7. Chemotherapy / Oncology Medications ───────────────────────────
-    const chemoKeywords = ['chemotherapy', 'chemo', 'tamoxifen', 'anastrozole', 'letrozole', 'cisplatin', 'carboplatin', 'doxorubicin', 'paclitaxel', 'cyclophosphamide'];
-    const chemoSupplements = ["st. john", "st john", 'high-dose', 'nac', 'melatonin'];
-    if (has(medsLower, chemoKeywords) && hasIngr(chemoSupplements)) {
-        warnings.push('You are on oncology medications. High-dose antioxidants and certain supplements may interfere with treatment. Physician oncologist review is REQUIRED before using any supplement.');
-    }
-
-    // ── 8. Statins (Cholesterol Medications) ────────────────────────────
-    const statins = ['atorvastatin', 'lipitor', 'rosuvastatin', 'crestor', 'simvastatin', 'zocor', 'pravastatin', 'fluvastatin', 'lovastatin'];
-    if (has(medsLower, statins)) {
-        if (hasIngr(['red yeast rice'])) {
-            warnings.push('CRITICAL: Red Yeast Rice contains natural lovastatin and must NOT be combined with statin medications — risk of rhabdomyolysis. Remove immediately.');
-        }
-        const statinRisky = ['niacin', 'berberine'];
-        if (hasIngr(statinRisky)) {
-            const found = matchingIngr(statinRisky);
-            warnings.push(`Contains ${found.join(', ')} which has additive lipid-lowering effects with your statin. Monitor for muscle pain/weakness (myopathy).`);
-        }
-    }
-
-    // ── 9. Hormone Medications (HRT, Testosterone, Contraceptives) ──────
-    const hormoneMeds = ['estradiol', 'progesterone', 'testosterone', 'birth control', 'contraceptive', 'clomid', 'clomiphene', 'finasteride', 'propecia', 'spironolactone'];
-    const hormoneSupplements = ['ashwagandha', 'maca', 'dhea', 'dim', 'saw palmetto', 'black cohosh', 'vitex', 'tribulus'];
-    if (has(medsLower, hormoneMeds) && hasIngr(hormoneSupplements)) {
-        const found = matchingIngr(hormoneSupplements);
-        warnings.push(`Contains hormone-modulating ingredients (${found.join(', ')}) which may interact with your hormone therapy. Coordinate with your prescribing physician.`);
-    }
-
-    // ── 10. Seizure / Epilepsy Medications ──────────────────────────────
-    const seizureMeds = ['carbamazepine', 'tegretol', 'phenytoin', 'dilantin', 'valproic', 'depakote', 'lamotrigine', 'lamictal', 'gabapentin', 'neurontin', 'levetiracetam', 'keppra', 'topiramate', 'topamax'];
-    const seizureSupplements = ['ginkgo', 'evening primrose', 'vitamin b6', "st. john", "st john"];
-    if (has(medsLower, seizureMeds) && hasIngr(seizureSupplements)) {
-        const found = matchingIngr(seizureSupplements);
-        warnings.push(`Contains ${found.join(', ')} which may lower seizure threshold or alter anti-epileptic drug levels. Consult your neurologist before starting.`);
-    }
-
-    // ── 11. Sedatives / Benzodiazepines / Sleep Medications ─────────────
-    const sedativeMeds = ['diazepam', 'valium', 'alprazolam', 'xanax', 'lorazepam', 'ativan', 'clonazepam', 'klonopin', 'zolpidem', 'ambien', 'eszopiclone', 'lunesta', 'temazepam'];
-    const sedativeSupplements = ['valerian', 'gaba', 'melatonin', 'kava', 'passionflower', 'magnolia'];
-    if (has(medsLower, sedativeMeds) && hasIngr(sedativeSupplements)) {
-        const found = matchingIngr(sedativeSupplements);
-        warnings.push(`Contains ${found.join(', ')} which may cause additive sedation with your sedative/sleep medication. Risk of excessive drowsiness — consult your physician.`);
-    }
-
-    // ── 12. Opioid Pain Medications ─────────────────────────────────────
-    const opioidMeds = ['oxycodone', 'oxycontin', 'hydrocodone', 'vicodin', 'tramadol', 'ultram', 'morphine', 'codeine', 'fentanyl', 'methadone', 'buprenorphine', 'suboxone'];
-    const opioidSupplements = ['valerian', 'gaba', 'kava', 'passionflower', 'magnolia', 'melatonin'];
-    if (has(medsLower, opioidMeds) && hasIngr(opioidSupplements)) {
-        const found = matchingIngr(opioidSupplements);
-        warnings.push(`Contains sedating supplements (${found.join(', ')}) which may cause dangerous additive CNS depression with opioid medications. Physician approval required.`);
-    }
-
-    // ── 13. ADHD Stimulant Medications ───────────────────────────────────
-    const adhdMeds = ['methylphenidate', 'ritalin', 'concerta', 'amphetamine', 'adderall', 'lisdexamfetamine', 'vyvanse', 'dextroamphetamine', 'dexedrine', 'atomoxetine', 'strattera'];
-    const adhdSupplements = ['caffeine', 'rhodiola', 'ginseng', 'tyrosine', 'yohimbine', 'synephrine'];
-    if (has(medsLower, adhdMeds) && hasIngr(adhdSupplements)) {
-        const found = matchingIngr(adhdSupplements);
-        warnings.push(`Contains stimulating ingredients (${found.join(', ')}) which may cause additive cardiovascular stress and overstimulation with your ADHD medication. Discuss with your physician.`);
-    }
-
-    // ── 14. PPIs / Acid Reducers ────────────────────────────────────────
-    const ppiMeds = ['omeprazole', 'prilosec', 'pantoprazole', 'protonix', 'esomeprazole', 'nexium', 'lansoprazole', 'prevacid', 'famotidine', 'pepcid', 'ranitidine'];
-    const ppiSupplements = ['iron', 'calcium', 'magnesium', 'vitamin b12', 'zinc'];
-    if (has(medsLower, ppiMeds) && hasIngr(ppiSupplements)) {
-        const found = matchingIngr(ppiSupplements);
-        warnings.push(`PPIs reduce absorption of ${found.join(', ')}. Take these supplements at least 2 hours apart from your acid reducer for best absorption.`);
-    }
-
-    // ── 15. Antibiotics ─────────────────────────────────────────────────
-    const antibiotics = ['tetracycline', 'doxycycline', 'minocycline', 'ciprofloxacin', 'cipro', 'levofloxacin', 'levaquin', 'moxifloxacin', 'amoxicillin', 'azithromycin'];
-    const antibioticSupplements = ['calcium', 'iron', 'magnesium', 'zinc'];
-    if (has(medsLower, antibiotics) && hasIngr(antibioticSupplements)) {
-        const found = matchingIngr(antibioticSupplements);
-        warnings.push(`Minerals (${found.join(', ')}) can chelate and reduce absorption of your antibiotic. Take supplements at least 2-4 hours apart from your antibiotic dose.`);
-    }
-
-    // ── 16. Corticosteroids ─────────────────────────────────────────────
-    const corticosteroids = ['prednisone', 'prednisolone', 'dexamethasone', 'methylprednisolone', 'hydrocortisone', 'budesonide'];
-    if (has(medsLower, corticosteroids)) {
-        if (hasIngr(['licorice', 'glycyrrhizin'])) {
-            warnings.push('Licorice Root may worsen potassium depletion and fluid retention caused by corticosteroids. Avoid or use deglycyrrhizinated (DGL) form only.');
-        }
-        if (hasIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom'])) {
-            const found = matchingIngr(['echinacea', 'astragalus', 'elderberry', 'mushroom']);
-            warnings.push(`Immune-stimulating ingredients (${found.join(', ')}) may counteract the immunosuppressive effect of your corticosteroid. Consult your physician.`);
-        }
-    }
-
-    // ── 17. Heart Rhythm / Cardiac Glycosides ───────────────────────────
-    const cardiacMeds = ['digoxin', 'lanoxin', 'amiodarone', 'flecainide', 'sotalol', 'dofetilide', 'dronedarone'];
-    const cardiacSupplements = ['magnesium', 'potassium', 'hawthorn', 'licorice', 'glycyrrhizin'];
-    if (has(medsLower, cardiacMeds) && hasIngr(cardiacSupplements)) {
-        const found = matchingIngr(cardiacSupplements);
-        warnings.push(`Contains ${found.join(', ')} which can shift electrolyte balance and affect heart rhythm while on cardiac medications. Physician monitoring required.`);
-    }
-
-    // ── 18. CYP450 Enzyme Interactions (Narrow Therapeutic Index) ────────
-    const narrowTIDrugs = ['warfarin', 'cyclosporine', 'tacrolimus', 'theophylline', 'phenytoin', 'digoxin', 'lithium', 'carbamazepine'];
-    const cyp450Supplements = ["st. john", "st john", 'goldenseal', 'grapefruit'];
-    if (has(medsLower, narrowTIDrugs) && hasIngr(cyp450Supplements)) {
-        const found = matchingIngr(cyp450Supplements);
-        warnings.push(`Contains CYP450 enzyme modulators (${found.join(', ')}) which can dramatically alter blood levels of your narrow-therapeutic-index medication. This is potentially dangerous — physician review required.`);
-    }
-
-    // ── 19. Kidney Impairment Considerations ────────────────────────────
-    const kidneyKeywords = ['kidney', 'renal', 'dialysis', 'ckd', 'chronic kidney'];
-    // Check both medications and conditions-as-medications (users sometimes list conditions)
-    if (has(medsLower, kidneyKeywords)) {
-        const kidneySupplements = ['potassium', 'magnesium', 'phosphorus', 'creatine', 'vitamin c'];
-        if (hasIngr(kidneySupplements)) {
-            const found = matchingIngr(kidneySupplements);
-            warnings.push(`Contains ${found.join(', ')} which require dose adjustment or avoidance with kidney impairment. Consult your nephrologist before starting.`);
-        }
-    }
-
-    return warnings;
 }
 
 export function normalizePromptHealthProfile(profile: any): string {

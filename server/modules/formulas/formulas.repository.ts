@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { eq, desc, and, isNull, isNotNull, gte, lte } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../infra/db/db";
 import { logger } from '../../infra/logging/logger';
 import {
@@ -121,6 +121,45 @@ export class FormulasRepository {
             return formula;
         } catch (error) {
             logger.error('Error creating formula', { error });
+            throw new Error('Failed to create formula');
+        }
+    }
+
+    /**
+     * Create a new formula and atomically assign the next version number for
+     * the user. Uses a per-user transactional advisory lock to serialize
+     * concurrent saves — without this, two simultaneous chat saves can each
+     * compute MAX(version)+1 = N+1 and produce duplicate version rows.
+     *
+     * The caller MUST omit `version` from `insertFormula` (or it will be
+     * overwritten with the correct next value).
+     */
+    async createNextVersionFormula(userId: string, insertFormula: Omit<InsertFormula, 'version'> & { version?: number }): Promise<Formula> {
+        try {
+            return await db.transaction(async (tx) => {
+                // Per-user advisory lock — held until transaction commit/rollback.
+                // Hash userId to a 32-bit int (matches pg_advisory_xact_lock signature).
+                let h = 0;
+                for (let i = 0; i < userId.length; i++) {
+                    h = (Math.imul(31, h) + userId.charCodeAt(i)) | 0;
+                }
+                await tx.execute(sql`SELECT pg_advisory_xact_lock(${h})`);
+
+                const [latest] = await tx
+                    .select({ version: formulas.version })
+                    .from(formulas)
+                    .where(eq(formulas.userId, userId))
+                    .orderBy(desc(formulas.version))
+                    .limit(1);
+
+                const nextVersion = (latest?.version ?? 0) + 1;
+                const payload = { ...insertFormula, userId, version: nextVersion } as InsertFormula;
+                const normalized = normalizeFormulaInsertPayload(payload);
+                const [formula] = await tx.insert(formulas).values(normalized as DbInsertFormula).returning();
+                return formula;
+            });
+        } catch (error) {
+            logger.error('Error creating next version formula', { error, userId });
             throw new Error('Failed to create formula');
         }
     }

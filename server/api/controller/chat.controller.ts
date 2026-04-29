@@ -16,6 +16,7 @@ import { canonicalKey } from '../../modules/labs/biomarker-aliases';
 import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula, clampIngredientDosesToRange } from '../../modules/formulas/formula-service';
 import { expandFormulaWithAI, buildClinicalContextSummary } from '../../modules/chat/formula-expander';
 import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
+import { detectPregnancyStatus, detectNursingStatus } from '../../modules/formulas/profile-status-detector';
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
 import { recommendDailyProtocolCapsules } from '../../modules/chat/protocol-recommendation';
@@ -762,6 +763,16 @@ export class ChatController {
                     const calcResult = validateAndCalculateFormula(validatedFormula);
                     validatedFormula.totalMg = calcResult.calculatedTotalMg;
 
+                    // Early clamp: pull any AI-returned doses into clinical
+                    // range BEFORE autoFit makes budget decisions. This way
+                    // budget calculations and downstream autoExpand operate
+                    // on realistic per-ingredient amounts. The late clamp
+                    // (after autoExpand) remains as a safety net.
+                    const earlyClampNotes = clampIngredientDosesToRange(validatedFormula);
+                    if (earlyClampNotes.length > 0) {
+                        earlyClampNotes.forEach(note => sendSSE({ type: 'info', message: note }));
+                    }
+
                     const targetCaps = validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT;
                     const baseBudget = getMaxDosageForCapsules(targetCaps);
                     const maxWithTolerance = Math.floor(baseBudget * (1 + FORMULA_LIMITS.BUDGET_TOLERANCE_PERCENT));
@@ -892,14 +903,10 @@ export class ChatController {
                         const userConditions: string[] = (healthProfile as any)?.conditions || [];
                         const userAllergies: string[] = (healthProfile as any)?.allergies || [];
 
-                        // Detect pregnancy/nursing from conditions list
-                        const conditionsLower = userConditions.map(c => c.toLowerCase());
-                        const isPregnant = conditionsLower.some(c =>
-                          c.includes('pregnant') || c.includes('pregnancy') || c.includes('expecting')
-                        );
-                        const isNursing = conditionsLower.some(c =>
-                          c.includes('nursing') || c.includes('breastfeeding') || c.includes('lactating')
-                        );
+                        // Detect pregnancy/nursing from conditions list (centralized
+                        // detector — same keyword set used by revert/custom paths)
+                        const isPregnant = detectPregnancyStatus(userConditions);
+                        const isNursing = detectNursingStatus(userConditions);
 
                         const safetyResult = validateFormulaSafety({
                           formula: validatedFormula,
@@ -975,7 +982,7 @@ export class ChatController {
                               rationale: validatedFormula.rationale,
                               warnings: mergedWarnings,
                               disclaimers: validatedFormula.disclaimers || [],
-                              version: nextVersion,
+                              // version is assigned atomically by createNextVersionFormula
                               targetCapsules: validatedFormula.targetCapsules || FORMULA_LIMITS.DEFAULT_CAPSULE_COUNT,
                               chatSessionId: chatSession.id,
                               // Store structured safety data for acknowledgment tracking
@@ -987,7 +994,7 @@ export class ChatController {
 
                           // SAFETY NET: Retry formula save once on transient DB failure
                           try {
-                            savedFormula = await formulasRepository.createFormula(formulaData);
+                            savedFormula = await formulasRepository.createNextVersionFormula(userId, formulaData);
                           } catch (firstSaveErr) {
                             logger.warn('Formula save attempt 1 failed, retrying...', {
                               userId,
@@ -997,7 +1004,7 @@ export class ChatController {
                             // Wait briefly then retry once
                             await new Promise(resolve => setTimeout(resolve, 1000));
                             try {
-                              savedFormula = await formulasRepository.createFormula(formulaData);
+                              savedFormula = await formulasRepository.createNextVersionFormula(userId, formulaData);
                               logger.info('Formula save succeeded on retry', { userId });
                             } catch (retrySaveErr) {
                               // Both attempts failed — log full formula data for manual recovery
@@ -1012,6 +1019,9 @@ export class ChatController {
                               throw retrySaveErr;
                             }
                           }
+
+                          // Pull authoritative version from saved formula for downstream messaging.
+                          const nextVersion = savedFormula.version;
 
                           // In-app notification only — formula emails were removed
                           // (per user feedback: emailing on every formula iteration felt spammy).

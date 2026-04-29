@@ -37,17 +37,30 @@ export interface SafetyValidationInput {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const has = (list: string[], keywords: string[]) =>
-  list.some(m => keywords.some(k => m.includes(k)));
+// Normalize a string for fuzzy matching: lowercase + strip non-alphanumeric.
+// This makes "Co-Q10" / "CoQ10" / "Coenzyme Q-10" line up against keyword
+// patterns, and tolerates extra whitespace/punctuation in user-entered
+// medication names ("St. John's Wort" vs "st johns wort").
+const normalizeForMatch = (s: string): string =>
+  (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-const hasIngr = (allIngredients: string[], keywords: string[]) =>
-  allIngredients.some(i => keywords.some(k => i.includes(k)));
+const has = (list: string[], keywords: string[]) => {
+  const normalizedList = list.map(normalizeForMatch);
+  return normalizedList.some(m => keywords.some(k => m.includes(normalizeForMatch(k))));
+};
+
+const hasIngr = (allIngredients: string[], keywords: string[]) => {
+  const normalizedList = allIngredients.map(normalizeForMatch);
+  return normalizedList.some(i => keywords.some(k => i.includes(normalizeForMatch(k))));
+};
 
 const matchingIngr = (allIngredients: string[], keywords: string[]) => {
   const matches = new Set<string>();
+  const normalizedKeywords = keywords.map(normalizeForMatch);
   for (const i of allIngredients) {
-    for (const k of keywords) {
-      if (i.includes(k)) matches.add(i);
+    const normalizedI = normalizeForMatch(i);
+    for (const k of normalizedKeywords) {
+      if (normalizedI.includes(k)) matches.add(i);
     }
   }
   return [...matches];
@@ -169,10 +182,20 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
   if (medsLower.length > 0) {
 
     // ── 3b. Anticoagulants / Blood Thinners ─────────────────────────────
-    // Warfarin/Coumadin specifically is CRITICAL (narrow therapeutic index)
-    const warfarinFamily = ['warfarin', 'coumadin'];
-    const otherBloodThinners = ['clopidogrel', 'plavix', 'rivaroxaban', 'xarelto', 'apixaban', 'eliquis', 'dabigatran', 'pradaxa', 'heparin', 'enoxaparin'];
-    const allBloodThinners = [...warfarinFamily, ...otherBloodThinners, 'aspirin'];
+    // Warfarin/Coumadin specifically is CRITICAL (narrow therapeutic index).
+    // Includes brand-name variants commonly written by users.
+    const warfarinFamily = ['warfarin', 'coumadin', 'jantoven'];
+    const otherBloodThinners = [
+      'clopidogrel', 'plavix',
+      'rivaroxaban', 'xarelto',
+      'apixaban', 'eliquis',
+      'dabigatran', 'pradaxa',
+      'edoxaban', 'savaysa', 'lixiana',
+      'ticagrelor', 'brilinta',
+      'prasugrel', 'effient',
+      'heparin', 'enoxaparin', 'lovenox', 'fondaparinux', 'arixtra',
+    ];
+    const allBloodThinners = [...warfarinFamily, ...otherBloodThinners, 'aspirin', 'asa ', 'baby aspirin'];
     const btSupplements = ['omega', 'fish oil', 'garlic', 'ginger', 'ginkgo', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
     if (has(medsLower, allBloodThinners) && hasIngr(allIngredients, btSupplements)) {
       const found = matchingIngr(allIngredients, btSupplements);
@@ -189,7 +212,28 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     }
 
     // ── 3c. Antidepressants — St. John's Wort (CRITICAL) ────────────────
-    const ssriSnri = ['sertraline', 'zoloft', 'fluoxetine', 'prozac', 'escitalopram', 'lexapro', 'citalopram', 'paroxetine', 'paxil', 'venlafaxine', 'effexor', 'duloxetine', 'cymbalta', 'bupropion', 'wellbutrin', 'maoi', 'phenelzine', 'tranylcypromine', 'lithium', 'quetiapine', 'seroquel'];
+    const ssriSnri = [
+      'sertraline', 'zoloft',
+      'fluoxetine', 'prozac', 'sarafem',
+      'escitalopram', 'lexapro',
+      'citalopram', 'celexa',
+      'paroxetine', 'paxil', 'pexeva',
+      'venlafaxine', 'effexor',
+      'desvenlafaxine', 'pristiq',
+      'duloxetine', 'cymbalta',
+      'bupropion', 'wellbutrin', 'zyban',
+      'mirtazapine', 'remeron',
+      'trazodone', 'desyrel',
+      'vilazodone', 'viibryd',
+      'vortioxetine', 'trintellix',
+      'amitriptyline', 'elavil',
+      'nortriptyline', 'pamelor',
+      'maoi', 'phenelzine', 'nardil',
+      'tranylcypromine', 'parnate',
+      'lithium', 'lithobid',
+      'quetiapine', 'seroquel',
+      'aripiprazole', 'abilify',
+    ];
     if (has(medsLower, ssriSnri)) {
       if (hasIngr(allIngredients, ["st. john", "st john"])) {
         warnings.push({
@@ -214,7 +258,14 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     }
 
     // ── 3d. Thyroid Medications ──────────────────────────────────────────
-    const thyroidMeds = ['levothyroxine', 'synthroid', 'tirosint', 'liothyronine', 'cytomel', 'armour thyroid'];
+    const thyroidMeds = [
+      'levothyroxine', 'synthroid', 'levoxyl', 'tirosint', 'unithroid', 'euthyrox',
+      'liothyronine', 'cytomel',
+      'liotrix', 'thyrolar',
+      'armour thyroid', 'np thyroid', 'nature-throid', 'naturethroid', 'wp thyroid',
+      'methimazole', 'tapazole',
+      'propylthiouracil', 'ptu',
+    ];
     const thyroidSupplements = ['thyroid support', 'ashwagandha', 'iodine', 'kelp', 'seaweed', 'selenium', 'zinc'];
     if (has(medsLower, thyroidMeds) && hasIngr(allIngredients, thyroidSupplements)) {
       const found = matchingIngr(allIngredients, thyroidSupplements);
@@ -228,7 +279,26 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     }
 
     // ── 3e. Diabetes / Blood Sugar Medications ──────────────────────────
-    const diabetesMeds = ['metformin', 'insulin', 'glipizide', 'glyburide', 'semaglutide', 'ozempic', 'wegovy', 'tirzepatide', 'mounjaro', 'sitagliptin', 'januvia', 'empagliflozin', 'jardiance', 'dapagliflozin', 'canagliflozin'];
+    const diabetesMeds = [
+      'metformin', 'glucophage', 'glumetza', 'fortamet', 'riomet',
+      'insulin', 'humalog', 'novolog', 'lantus', 'levemir', 'tresiba', 'basaglar', 'toujeo',
+      'glipizide', 'glucotrol',
+      'glyburide', 'diabeta', 'micronase', 'glynase',
+      'glimepiride', 'amaryl',
+      'semaglutide', 'ozempic', 'wegovy', 'rybelsus',
+      'tirzepatide', 'mounjaro', 'zepbound',
+      'liraglutide', 'victoza', 'saxenda',
+      'dulaglutide', 'trulicity',
+      'sitagliptin', 'januvia',
+      'linagliptin', 'tradjenta',
+      'saxagliptin', 'onglyza',
+      'empagliflozin', 'jardiance',
+      'dapagliflozin', 'farxiga',
+      'canagliflozin', 'invokana',
+      'pioglitazone', 'actos',
+      'rosiglitazone', 'avandia',
+      'acarbose', 'precose',
+    ];
     const diabetesSupplements = ['berberine', 'cinnamon', 'chromium', 'alpha lipoic', 'innoslim', 'bitter melon', 'gymnema'];
     if (has(medsLower, diabetesMeds) && hasIngr(allIngredients, diabetesSupplements)) {
       const found = matchingIngr(allIngredients, diabetesSupplements);
@@ -242,7 +312,33 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     }
 
     // ── 3f. Blood Pressure Medications ──────────────────────────────────
-    const bpMeds = ['lisinopril', 'amlodipine', 'metoprolol', 'losartan', 'valsartan', 'hydrochlorothiazide', 'carvedilol', 'verapamil', 'diltiazem', 'enalapril', 'ramipril'];
+    const bpMeds = [
+      'lisinopril', 'prinivil', 'zestril', 'qbrelis',
+      'enalapril', 'vasotec',
+      'ramipril', 'altace',
+      'benazepril', 'lotensin',
+      'captopril', 'capoten',
+      'losartan', 'cozaar',
+      'valsartan', 'diovan',
+      'olmesartan', 'benicar',
+      'irbesartan', 'avapro',
+      'telmisartan', 'micardis',
+      'amlodipine', 'norvasc',
+      'nifedipine', 'procardia', 'adalat',
+      'felodipine', 'plendil',
+      'verapamil', 'calan', 'verelan', 'isoptin',
+      'diltiazem', 'cardizem', 'tiazac',
+      'metoprolol', 'lopressor', 'toprol',
+      'atenolol', 'tenormin',
+      'propranolol', 'inderal',
+      'carvedilol', 'coreg',
+      'bisoprolol', 'zebeta',
+      'labetalol', 'trandate',
+      'hydrochlorothiazide', 'hctz', 'microzide',
+      'chlorthalidone',
+      'furosemide', 'lasix',
+      'spironolactone', 'aldactone',
+    ];
     const bpSupplements = ['magnesium', 'coq10', 'hawthorn', 'garlic', 'omega', 'potassium'];
     if (has(medsLower, bpMeds) && hasIngr(allIngredients, bpSupplements)) {
       const found = matchingIngr(allIngredients, bpSupplements);
@@ -302,7 +398,15 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     }
 
     // ── 3i. Statins — Red Yeast Rice (CRITICAL) ─────────────────────────
-    const statins = ['atorvastatin', 'lipitor', 'rosuvastatin', 'crestor', 'simvastatin', 'zocor', 'pravastatin', 'fluvastatin', 'lovastatin'];
+    const statins = [
+      'atorvastatin', 'lipitor',
+      'rosuvastatin', 'crestor', 'ezallor',
+      'simvastatin', 'zocor',
+      'pravastatin', 'pravachol',
+      'fluvastatin', 'lescol',
+      'lovastatin', 'mevacor', 'altoprev',
+      'pitavastatin', 'livalo', 'zypitamag',
+    ];
     if (has(medsLower, statins)) {
       if (hasIngr(allIngredients, ['red yeast rice'])) {
         warnings.push({

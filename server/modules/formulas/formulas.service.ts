@@ -7,15 +7,37 @@ import { type Formula, type ReviewSchedule } from "@shared/schema";
 import { manufacturerPricingService } from "./manufacturer-pricing.service";
 import { autoShipService } from "../billing/autoship.service";
 import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules, getMinIngredientCountForCapsules } from "./formula-service";
+import { validateFormulaSafety } from "./safety-validator";
+import { detectPregnancyStatus, detectNursingStatus } from "./profile-status-detector";
+
+// Block formulas that include any ingredient currently flagged as
+// discontinued in the manufacturer catalog. AI chat already filters these
+// via prompt context, but custom/manual formula creation paths bypass that
+// guidance and need an explicit gate so users can't ship a formula that
+// can't actually be manufactured.
+async function assertNoDiscontinuedIngredients(items: Array<{ ingredient?: string; name?: string }>) {
+    if (!Array.isArray(items) || items.length === 0) return;
+    const { ingredientCatalogRepository } = await import('./ingredient-catalog.repository');
+    const catalog = await ingredientCatalogRepository.getAll();
+    const discontinued = new Set(
+        catalog.filter((i: any) => i.status === 'discontinued').map((i: any) => String(i.name).toLowerCase().trim())
+    );
+    if (discontinued.size === 0) return;
+    const offending: string[] = [];
+    for (const item of items) {
+        const name = String(item?.ingredient || item?.name || '').toLowerCase().trim();
+        if (name && discontinued.has(name)) offending.push(item?.ingredient || item?.name || name);
+    }
+    if (offending.length > 0) {
+        throw new Error(`The following ingredient${offending.length > 1 ? 's are' : ' is'} no longer available from our manufacturer: ${offending.join(', ')}. Please choose alternatives.`);
+    }
+}
 
 // Capsule-aware dosage limits derived from formula-service.ts
 // Max for any capsule count: 12 × 550mg = 6,600mg (absolute ceiling)
 // Default (9 caps): 9 × 550mg = 4,950mg
-const FORMULA_LIMITS = {
-    ABSOLUTE_MAX_DOSAGE: CAPSULE_LIMITS.CAPSULE_CAPACITY_MG * 12, // 6,600mg — hard ceiling across all tiers
-    MIN_INGREDIENT_DOSE: 10,       // Global minimum dose per ingredient in mg
-    MAX_INGREDIENT_COUNT: 50,      // Maximum number of ingredients
-} as const;
+// (Local FORMULA_LIMITS constant removed — was unused; canonical limits live
+// in formula-service.ts and are imported as CAPSULE_LIMITS where needed.)
 
 export class FormulasService {
     async getFormulaQuote(userId: string, formulaId?: string, capsuleCount?: number) {
@@ -173,14 +195,62 @@ export class FormulasService {
             throw new Error(`Cannot revert to this formula — it only has ${revertTotalIngredients} ingredients, but ${revertCapsules} capsules/day requires at least ${revertMinIngredients}. Please create a new formula instead.`);
         }
 
-        // Get current highest version for user
-        const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
-        const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
+        // ── SAFETY RE-VALIDATION ────────────────────────────────────────────
+        // Run the full safety validator against the user's CURRENT health
+        // profile. Older formula versions were validated against the profile
+        // that existed AT THE TIME they were created — but the user may have
+        // since added a medication, allergy, or condition that makes the old
+        // formula unsafe (e.g. started Warfarin, became pregnant). Block the
+        // revert if any critical safety issue surfaces.
+        const profile = await usersRepository.getHealthProfile(userId);
+        const userMedications: string[] = (profile as any)?.medications || [];
+        const userConditions: string[] = (profile as any)?.conditions || [];
+        const userAllergies: string[] = (profile as any)?.allergies || [];
+        const isPregnant = detectPregnancyStatus(userConditions);
+        const isNursing = detectNursingStatus(userConditions);
 
-        // Create new formula version with reverted data (preserve all fields)
-        const revertedFormula = await formulasRepository.createFormula({
+        const safetyResult = validateFormulaSafety({
+            formula: {
+                bases: revertBases,
+                additions: revertAdditions,
+            },
+            userMedications,
+            userConditions,
+            userAllergies,
+            isPregnant,
+            isNursing,
+        });
+
+        if (!safetyResult.safe) {
+            const reasons = safetyResult.blockedReasons.join('; ');
+            logger.warn('Formula revert BLOCKED by safety validator', {
+                userId,
+                originalFormulaId: formulaId,
+                originalVersion: originalFormula.version,
+                blockedReasons: safetyResult.blockedReasons,
+                criticalCount: safetyResult.warnings.filter(w => w.severity === 'critical').length,
+            });
+            throw new Error(`Cannot revert to v${originalFormula.version}: it contains ingredients that conflict with your current health profile (medications, allergies, or conditions). ${reasons}. Please create a new formula instead so we can build a safe protocol around your latest profile.`);
+        }
+
+        // Log non-blocking serious warnings so we have a record of what was
+        // surfaced when the user reverted (useful for compliance audits).
+        const seriousWarnings = safetyResult.warnings.filter(w => w.severity === 'serious');
+        if (seriousWarnings.length > 0) {
+            logger.info('Formula revert proceeding with serious (non-blocking) warnings', {
+                userId,
+                originalFormulaId: formulaId,
+                originalVersion: originalFormula.version,
+                seriousWarnings: seriousWarnings.map(w => ({ category: w.category, message: w.message })),
+            });
+        }
+
+        // Create new formula version with reverted data (preserve all fields).
+        // safetyValidation is REPLACED with a freshly-computed result so the
+        // audit trail reflects validation against the user's CURRENT profile.
+        // Uses createNextVersionFormula for race-safe version assignment.
+        const revertedFormula = await formulasRepository.createNextVersionFormula(userId, {
             userId,
-            version: nextVersion,
             bases: originalFormula.bases as any,
             additions: originalFormula.additions as any,
             totalMg: originalFormula.totalMg,
@@ -188,7 +258,7 @@ export class FormulasService {
             rationale: originalFormula.rationale as any,
             warnings: originalFormula.warnings as any,
             disclaimers: originalFormula.disclaimers as any,
-            safetyValidation: originalFormula.safetyValidation as any,
+            safetyValidation: safetyResult as any,
             notes: `Reverted to v${originalFormula.version}: ${reason}`
         });
 
@@ -229,6 +299,11 @@ export class FormulasService {
     async customizeFormula(userId: string, formulaId: string, addedBases: any[], addedIndividuals: any[]) {
         // Validate that all added ingredients are valid and within dose ranges
         const allAdded = [...(addedBases || []), ...(addedIndividuals || [])];
+
+        // Reject any ingredient currently flagged as discontinued in the
+        // manufacturer catalog before we do anything else.
+        await assertNoDiscontinuedIngredients(allAdded);
+
         for (const item of allAdded) {
             if (!isValidIngredient(item.ingredient)) {
                 throw new Error(`Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`);
@@ -264,25 +339,30 @@ export class FormulasService {
             }
         }
 
-        // Calculate new total mg with customizations
-        // Use user-specified amount, falling back to catalog default only if amount not provided
+        // Calculate new total mg with customizations.
+        // Use user-specified amount, falling back to catalog default. If neither
+        // is available we now THROW instead of silently dropping the ingredient
+        // from the total — silent drops let the user save a formula whose stored
+        // totalMg doesn't match the ingredient list.
         let newTotalMg = formula.totalMg;
+
+        const resolveDose = (item: any): number => {
+            const explicit = Number(item.amount);
+            if (Number.isFinite(explicit) && explicit > 0) return explicit;
+            const catalog = getIngredientDose(item.ingredient);
+            if (typeof catalog === 'number' && Number.isFinite(catalog) && catalog > 0) return catalog;
+            throw new Error(`Cannot determine dose for ${item.ingredient} — please specify an amount.`);
+        };
 
         if (addedBases) {
             for (const base of addedBases) {
-                const dose = base.amount || getIngredientDose(base.ingredient);
-                if (dose) {
-                    newTotalMg += dose;
-                }
+                newTotalMg += resolveDose(base);
             }
         }
 
         if (addedIndividuals) {
             for (const individual of addedIndividuals) {
-                const dose = individual.amount || getIngredientDose(individual.ingredient);
-                if (dose) {
-                    newTotalMg += dose;
-                }
+                newTotalMg += resolveDose(individual);
             }
         }
 
@@ -292,6 +372,34 @@ export class FormulasService {
         if (newTotalMg > customizeHardLimit) {
             const addedMg = newTotalMg - formula.totalMg;
             throw new Error(`Adding these ingredients would exceed the maximum safe dosage of ${customizeHardLimit}mg for ${formula.targetCapsules || CAPSULE_LIMITS.DEFAULT_CAPSULE_COUNT} capsules. Current formula: ${formula.totalMg}mg, Adding: ${addedMg}mg, New total would be: ${newTotalMg}mg. Please remove some ingredients first or add fewer ingredients.`);
+        }
+
+        // ── SAFETY RE-VALIDATION ────────────────────────────────────────────
+        // Run safety validator against current health profile, including the
+        // newly-added ingredients. Block the customization if a critical issue
+        // surfaces (e.g. user just added Garlic to a formula while on Warfarin).
+        const profile = await usersRepository.getHealthProfile(userId);
+        const userMedications: string[] = (profile as any)?.medications || [];
+        const userConditions: string[] = (profile as any)?.conditions || [];
+        const userAllergies: string[] = (profile as any)?.allergies || [];
+        const customizeSafety = validateFormulaSafety({
+            formula: {
+                bases: [...((formula.bases as any[]) || []), ...(addedBases || [])],
+                additions: [...((formula.additions as any[]) || []), ...(addedIndividuals || [])],
+            },
+            userMedications,
+            userConditions,
+            userAllergies,
+            isPregnant: detectPregnancyStatus(userConditions),
+            isNursing: detectNursingStatus(userConditions),
+        });
+        if (!customizeSafety.safe) {
+            logger.warn('Formula customization BLOCKED by safety validator', {
+                userId,
+                formulaId,
+                blockedReasons: customizeSafety.blockedReasons,
+            });
+            throw new Error(`Cannot add these ingredients — they conflict with your current health profile: ${customizeSafety.blockedReasons.join('; ')}`);
         }
 
         // Update formula with customizations
@@ -312,6 +420,12 @@ export class FormulasService {
 
         // Validate that all ingredients are valid catalog ingredients and within dose ranges
         const allIngredients = [...(bases || []), ...(individuals || [])];
+
+        // Reject any ingredient currently flagged as discontinued in the
+        // manufacturer catalog. Manual creation bypasses the AI prompt
+        // context that normally filters these out.
+        await assertNoDiscontinuedIngredients(allIngredients);
+
         for (const item of allIngredients) {
             if (!isValidIngredient(item.ingredient)) {
                 throw new Error(`Invalid ingredient: ${item.ingredient}. Only catalog ingredients are allowed.`);
@@ -327,25 +441,29 @@ export class FormulasService {
             }
         }
 
-        // Calculate total mg
-        // Use user-specified amount, falling back to catalog default only if amount not provided
+        // Calculate total mg.
+        // Use user-specified amount, falling back to catalog default. If neither
+        // resolves to a positive number we THROW — silently dropping ingredients
+        // would let the user save a formula whose stored totalMg doesn't match
+        // its ingredient list, breaking pricing and downstream validation.
         let totalMg = 0;
+        const resolveCustomDose = (item: any): number => {
+            const explicit = Number(item.amount);
+            if (Number.isFinite(explicit) && explicit > 0) return explicit;
+            const catalog = getIngredientDose(item.ingredient);
+            if (typeof catalog === 'number' && Number.isFinite(catalog) && catalog > 0) return catalog;
+            throw new Error(`Cannot determine dose for ${item.ingredient} — please specify an amount.`);
+        };
 
         if (bases) {
             for (const base of bases) {
-                const dose = base.amount || getIngredientDose(base.ingredient);
-                if (dose) {
-                    totalMg += dose;
-                }
+                totalMg += resolveCustomDose(base);
             }
         }
 
         if (individuals) {
             for (const individual of individuals) {
-                const dose = individual.amount || getIngredientDose(individual.ingredient);
-                if (dose) {
-                    totalMg += dose;
-                }
+                totalMg += resolveCustomDose(individual);
             }
         }
 
@@ -369,14 +487,34 @@ export class FormulasService {
             throw new Error(`A ${capsuleCount}-capsule formula requires at least ${minIngredients} ingredients. You've added ${allIngredients.length}. Please add ${minIngredients - allIngredients.length} more ingredient${minIngredients - allIngredients.length > 1 ? 's' : ''}.`);
         }
 
-        // Get current formula to determine next version number (consistent with chat + revert paths)
-        const currentFormula = await formulasRepository.getCurrentFormulaByUser(userId);
-        const nextVersion = currentFormula ? currentFormula.version + 1 : 1;
+        // ── SAFETY VALIDATION ──────────────────────────────────────────────
+        // Custom formulas built without AI still need to be safety-checked
+        // against the user's medications, allergies, and conditions.
+        const customCreateProfile = await usersRepository.getHealthProfile(userId);
+        const customMedications: string[] = (customCreateProfile as any)?.medications || [];
+        const customConditions: string[] = (customCreateProfile as any)?.conditions || [];
+        const customAllergies: string[] = (customCreateProfile as any)?.allergies || [];
+        const customSafety = validateFormulaSafety({
+            formula: { bases: bases || [], additions: individuals || [] },
+            userMedications: customMedications,
+            userConditions: customConditions,
+            userAllergies: customAllergies,
+            isPregnant: detectPregnancyStatus(customConditions),
+            isNursing: detectNursingStatus(customConditions),
+        });
+        if (!customSafety.safe) {
+            logger.warn('Custom formula creation BLOCKED by safety validator', {
+                userId,
+                blockedReasons: customSafety.blockedReasons,
+            });
+            throw new Error(`Cannot create this formula — it conflicts with your current health profile: ${customSafety.blockedReasons.join('; ')}`);
+        }
 
-        // Create new formula marked as user-created
-        const newFormula = await formulasRepository.createFormula({
+        // Create new formula marked as user-created.
+        // Uses createNextVersionFormula for race-safe version assignment
+        // (per-user advisory lock prevents duplicate v=N+1 from concurrent saves).
+        const newFormula = await formulasRepository.createNextVersionFormula(userId, {
             userId,
-            version: nextVersion,
             name: name?.trim() || undefined,
             userCreated: true,
             bases: bases || [],
@@ -391,8 +529,12 @@ export class FormulasService {
                 'Consider discussing with AI for optimization and safety review.',
                 'Always consult your healthcare provider before starting any new supplement regimen.'
             ],
+            safetyValidation: customSafety as any,
             notes: null
         });
+
+        // For downstream notifications/messages.
+        const nextVersion = newFormula.version;
 
         // 📬 In-app notification only — formula emails were removed
         // (per user feedback: emailing on every formula iteration felt spammy).
