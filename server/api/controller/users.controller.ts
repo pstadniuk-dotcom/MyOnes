@@ -136,32 +136,82 @@ export class UsersController {
         try {
             const userId = req.userId!;
 
+            // Diagnostic: log what we actually received so we can debug
+            // "400 Bad Request" reports from real users in Render logs.
+            const fileKeys = req.files ? Object.keys(req.files) : [];
+            const contentType = req.headers['content-type'] || '';
+            const contentLength = req.headers['content-length'] || '';
+
             if (!req.files || !req.files.image) {
-                return res.status(400).json({ error: 'No image uploaded. Send field "image".' });
+                logger.warn('Supplement scan rejected: no image field', {
+                    userId,
+                    fileKeys,
+                    contentType,
+                    contentLength,
+                });
+                return res.status(400).json({
+                    error: fileKeys.length > 0
+                        ? `Upload field must be named "image" (got: ${fileKeys.join(', ')}).`
+                        : 'No image uploaded. Make sure you are attaching a photo.',
+                });
             }
 
             // express-fileupload sets req.files.image as a single UploadedFile or array
             const raw = Array.isArray(req.files.image) ? req.files.image[0] : (req.files.image as UploadedFile);
             if (!raw) {
+                logger.warn('Supplement scan rejected: empty image entry', { userId });
                 return res.status(400).json({ error: 'Uploaded file is empty.' });
             }
 
             // Basic validation: image MIME type, size cap 12MB
             if (!raw.mimetype || !raw.mimetype.startsWith('image/')) {
-                return res.status(400).json({ error: 'File must be an image.' });
+                logger.warn('Supplement scan rejected: non-image mimetype', {
+                    userId,
+                    mimetype: raw.mimetype,
+                    name: raw.name,
+                    size: raw.size,
+                });
+                return res.status(400).json({
+                    error: `File must be an image (got "${raw.mimetype || 'unknown'}"). Try a JPG or PNG photo.`,
+                });
             }
             if (raw.size > 12 * 1024 * 1024) {
+                logger.warn('Supplement scan rejected: image too large', { userId, size: raw.size });
                 return res.status(400).json({ error: 'Image too large (max 12MB).' });
+            }
+            if (raw.truncated) {
+                logger.warn('Supplement scan rejected: upload truncated by middleware', {
+                    userId,
+                    size: raw.size,
+                });
+                return res.status(400).json({ error: 'Upload was cut off. Try a smaller image (under 12MB).' });
             }
 
             // The global fileUpload middleware uses temp files (useTempFiles: true),
             // so raw.data is an empty Buffer and the bytes live on disk at tempFilePath.
             // Fall back to the in-memory buffer for any callers that change that config.
-            const fileBuffer = (raw.data && raw.data.length > 0)
-                ? raw.data
-                : (raw.tempFilePath ? fs.readFileSync(raw.tempFilePath) : Buffer.alloc(0));
+            let fileBuffer: Buffer;
+            try {
+                fileBuffer = (raw.data && raw.data.length > 0)
+                    ? raw.data
+                    : (raw.tempFilePath ? fs.readFileSync(raw.tempFilePath) : Buffer.alloc(0));
+            } catch (readErr) {
+                logger.error('Supplement scan: failed to read temp file', {
+                    userId,
+                    tempFilePath: raw.tempFilePath,
+                    error: readErr instanceof Error ? readErr.message : readErr,
+                });
+                return res.status(500).json({ error: 'Could not read uploaded image. Please try again.' });
+            }
 
             if (fileBuffer.length === 0) {
+                logger.warn('Supplement scan rejected: zero-byte buffer', {
+                    userId,
+                    declaredSize: raw.size,
+                    hasData: !!raw.data,
+                    dataLen: raw.data?.length ?? 0,
+                    tempFilePath: raw.tempFilePath,
+                });
                 return res.status(400).json({ error: 'Uploaded file is empty.' });
             }
 

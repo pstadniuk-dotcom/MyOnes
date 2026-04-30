@@ -3,6 +3,7 @@ import "express-async-errors";
 // force reload
 import path from "path";
 import fs from "fs";
+import os from "os";
 import crypto from "crypto";
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
@@ -231,13 +232,18 @@ app.use(session({
   }
 }));
 
-// Configure file upload middleware
+// Configure file upload middleware.
+// Phone photos of supplement labels routinely run 8-12MB, so we accept up to 15MB
+// at the middleware layer and let individual route controllers enforce their own
+// stricter caps (12MB for the supplement-label scanner, etc.) so they can return
+// a friendly JSON error instead of a mid-stream 413.
 app.use(fileUpload({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 15 * 1024 * 1024 },
   abortOnLimit: true,
+  responseOnLimit: 'File too large (max 15MB)',
   createParentPath: true,
   useTempFiles: true,
-  tempFileDir: '/tmp/'
+  tempFileDir: os.tmpdir(),
 }));
 
 app.use((req, res, next) => {
