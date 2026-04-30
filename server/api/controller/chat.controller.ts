@@ -16,6 +16,7 @@ import { canonicalKey } from '../../modules/labs/biomarker-aliases';
 import { extractCapsuleCountFromMessage, validateAndCorrectIngredientNames, validateAndCalculateFormula, FORMULA_LIMITS, getMaxDosageForCapsules, validateFormulaLimits, autoFitFormulaToBudget, autoExpandFormula, clampIngredientDosesToRange } from '../../modules/formulas/formula-service';
 import { expandFormulaWithAI, buildClinicalContextSummary } from '../../modules/chat/formula-expander';
 import { validateFormulaSafety, safetyWarningsToStrings } from '../../modules/formulas/safety-validator';
+import { unmatchedMedicationsRepository } from '../../modules/health/unmatched-medications.repository';
 import { detectPregnancyStatus, detectNursingStatus } from '../../modules/formulas/profile-status-detector';
 import { filterAIOutputClaims } from '../../modules/ai/claims-filter';
 import type { SafetyWarning } from '@shared/safety-types';
@@ -900,6 +901,7 @@ export class ChatController {
                         // Run the new severity-aware safety validator that covers:
                         // drug interactions, pregnancy/nursing, allergies, organ flags
                         const userMedications: string[] = (healthProfile as any)?.medications || [];
+                        const userMedicationsNormalized = (healthProfile as any)?.medicationsNormalized || [];
                         const userConditions: string[] = (healthProfile as any)?.conditions || [];
                         const userAllergies: string[] = (healthProfile as any)?.allergies || [];
 
@@ -911,11 +913,31 @@ export class ChatController {
                         const safetyResult = validateFormulaSafety({
                           formula: validatedFormula,
                           userMedications,
+                          userMedicationsNormalized,
                           userConditions,
                           userAllergies,
                           isPregnant,
                           isNursing,
                         });
+
+                        // Fire-and-forget: log medications no category recognized,
+                        // so the keyword-grooming feedback loop has data.
+                        if (safetyResult.unmatchedMedications && safetyResult.unmatchedMedications.length > 0) {
+                          const normalizedByRaw = new Map(
+                            (userMedicationsNormalized as Array<import('../../modules/health/medication-normalizer').NormalizedMedication>).map(n => [
+                              (n.raw || '').toLowerCase(),
+                              n,
+                            ])
+                          );
+                          unmatchedMedicationsRepository.logMany(
+                            safetyResult.unmatchedMedications.map(raw => ({
+                              userId,
+                              rawInput: raw,
+                              normalized: normalizedByRaw.get(raw.toLowerCase()) ?? null,
+                              contextEvent: 'safety_validator_chat',
+                            }))
+                          ).catch(() => { /* logged inside repo */ });
+                        }
 
                         // HARD BLOCK: If critical safety issues found, do NOT save formula
                         if (!safetyResult.safe) {

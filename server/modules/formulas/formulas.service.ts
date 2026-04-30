@@ -9,6 +9,28 @@ import { autoShipService } from "../billing/autoship.service";
 import { FORMULA_LIMITS as CAPSULE_LIMITS, getMaxDosageForCapsules, getMinIngredientCountForCapsules } from "./formula-service";
 import { validateFormulaSafety } from "./safety-validator";
 import { detectPregnancyStatus, detectNursingStatus } from "./profile-status-detector";
+import { unmatchedMedicationsRepository } from "../health/unmatched-medications.repository";
+
+// Helper: persist any medications the safety validator did not recognize so
+// the keyword-grooming feedback loop has data. Fire-and-forget; never
+// throws (the repo swallows + logs its own errors).
+function logUnmatchedMedicationsAsync(
+    userId: string,
+    unmatched: string[] | undefined,
+    normalizedList: Array<{ raw: string; generic: string | null; brandFamily: string | null; drugClass: string | null; confidence: number }>,
+    contextEvent: string,
+): void {
+    if (!unmatched || unmatched.length === 0) return;
+    const normByRaw = new Map(normalizedList.map(n => [(n.raw || '').toLowerCase(), n]));
+    void unmatchedMedicationsRepository.logMany(
+        unmatched.map(raw => ({
+            userId,
+            rawInput: raw,
+            normalized: normByRaw.get(raw.toLowerCase()) ?? null,
+            contextEvent,
+        }))
+    );
+}
 
 // Block formulas that include any ingredient currently flagged as
 // discontinued in the manufacturer catalog. AI chat already filters these
@@ -204,6 +226,7 @@ export class FormulasService {
         // revert if any critical safety issue surfaces.
         const profile = await usersRepository.getHealthProfile(userId);
         const userMedications: string[] = (profile as any)?.medications || [];
+        const userMedicationsNormalized = (profile as any)?.medicationsNormalized || [];
         const userConditions: string[] = (profile as any)?.conditions || [];
         const userAllergies: string[] = (profile as any)?.allergies || [];
         const isPregnant = detectPregnancyStatus(userConditions);
@@ -215,11 +238,13 @@ export class FormulasService {
                 additions: revertAdditions,
             },
             userMedications,
+            userMedicationsNormalized,
             userConditions,
             userAllergies,
             isPregnant,
             isNursing,
         });
+        logUnmatchedMedicationsAsync(userId, safetyResult.unmatchedMedications, userMedicationsNormalized, 'safety_validator_revert');
 
         if (!safetyResult.safe) {
             const reasons = safetyResult.blockedReasons.join('; ');
@@ -380,6 +405,7 @@ export class FormulasService {
         // surfaces (e.g. user just added Garlic to a formula while on Warfarin).
         const profile = await usersRepository.getHealthProfile(userId);
         const userMedications: string[] = (profile as any)?.medications || [];
+        const userMedicationsNormalized = (profile as any)?.medicationsNormalized || [];
         const userConditions: string[] = (profile as any)?.conditions || [];
         const userAllergies: string[] = (profile as any)?.allergies || [];
         const customizeSafety = validateFormulaSafety({
@@ -388,11 +414,13 @@ export class FormulasService {
                 additions: [...((formula.additions as any[]) || []), ...(addedIndividuals || [])],
             },
             userMedications,
+            userMedicationsNormalized,
             userConditions,
             userAllergies,
             isPregnant: detectPregnancyStatus(userConditions),
             isNursing: detectNursingStatus(userConditions),
         });
+        logUnmatchedMedicationsAsync(userId, customizeSafety.unmatchedMedications, userMedicationsNormalized, 'safety_validator_customize');
         if (!customizeSafety.safe) {
             logger.warn('Formula customization BLOCKED by safety validator', {
                 userId,
@@ -492,16 +520,19 @@ export class FormulasService {
         // against the user's medications, allergies, and conditions.
         const customCreateProfile = await usersRepository.getHealthProfile(userId);
         const customMedications: string[] = (customCreateProfile as any)?.medications || [];
+        const customMedicationsNormalized = (customCreateProfile as any)?.medicationsNormalized || [];
         const customConditions: string[] = (customCreateProfile as any)?.conditions || [];
         const customAllergies: string[] = (customCreateProfile as any)?.allergies || [];
         const customSafety = validateFormulaSafety({
             formula: { bases: bases || [], additions: individuals || [] },
             userMedications: customMedications,
+            userMedicationsNormalized: customMedicationsNormalized,
             userConditions: customConditions,
             userAllergies: customAllergies,
             isPregnant: detectPregnancyStatus(customConditions),
             isNursing: detectNursingStatus(customConditions),
         });
+        logUnmatchedMedicationsAsync(userId, customSafety.unmatchedMedications, customMedicationsNormalized, 'safety_validator_custom_create');
         if (!customSafety.safe) {
             logger.warn('Custom formula creation BLOCKED by safety validator', {
                 userId,

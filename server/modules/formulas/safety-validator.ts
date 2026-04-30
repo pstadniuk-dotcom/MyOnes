@@ -24,12 +24,29 @@ import { getContraindication } from '@shared/ingredient-contraindications';
 import { SYSTEM_SUPPORT_DETAILS } from '@shared/ingredients';
 
 // ── Types ───────────────────────────────────────────────────────────────────
+export interface NormalizedMedicationInput {
+  raw: string;
+  generic: string | null;
+  brandFamily: string | null;
+  drugClass: string | null;
+  confidence: number; // 0..1
+}
+
 export interface SafetyValidationInput {
   formula: {
     bases?: Array<{ ingredient: string; amount: number; unit?: string; purpose?: string }>;
     additions?: Array<{ ingredient: string; amount: number; unit?: string; purpose?: string }>;
   };
   userMedications: string[];
+  /**
+   * Optional AI-normalized representation of `userMedications`. When present,
+   * the deterministic keyword matchers expand each raw medication to also
+   * include its generic name, brand family, and drug class — so a user who
+   * types "Jantoven" still trips the warfarin guard via its `generic:
+   * 'warfarin'` mapping. Length and order need NOT match `userMedications`;
+   * each entry's `raw` field is what binds it back to a user input.
+   */
+  userMedicationsNormalized?: NormalizedMedicationInput[];
   userConditions: string[];
   userAllergies: string[];
   isPregnant: boolean;
@@ -120,6 +137,61 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
   const conditionsLower = (input.userConditions || []).map(c => c.toLowerCase());
   const allergiesLower = (input.userAllergies || []).map(a => a.toLowerCase());
 
+  // ── Medication expansion + match tracking ────────────────────────────
+  // For each raw medication, build a list of "search terms" to test against
+  // keyword categories. Terms include the raw input plus any AI-normalized
+  // generic / brand-family / drug-class strings. This is how a user typing
+  // "Jantoven" reaches the warfarin guard, and how "Mounjaro" reaches the
+  // diabetes guard via drugClass='diabetes'.
+  const medSearchTerms: string[][] = (input.userMedications || []).map((raw, idx) => {
+    const lower = (raw || '').toLowerCase();
+    const norm = (input.userMedicationsNormalized || []).find(
+      n => (n.raw || '').toLowerCase() === lower
+    );
+    const expansions = [lower];
+    if (norm) {
+      if (norm.generic) expansions.push(norm.generic.toLowerCase());
+      if (norm.brandFamily) expansions.push(norm.brandFamily.toLowerCase());
+      if (norm.drugClass) expansions.push(norm.drugClass.toLowerCase());
+    }
+    void idx;
+    return expansions;
+  });
+
+  // Flat union of ALL medication search terms — kept for debugging/logging.
+  // The actual hot path is hasMed(), which iterates per-medication so it can
+  // also flip per-medication match flags.
+  const medsLowerExpanded = medSearchTerms.flat();
+  void medsLowerExpanded;
+
+  // Per-medication match flags. Flipped to true the first time a medication
+  // (raw OR any normalized expansion) matches ANY keyword in ANY category.
+  // Anything still false at the end is logged as "unmatched" for the
+  // insights/keyword-grooming feedback loop.
+  const medMatched: boolean[] = (input.userMedications || []).map(() => false);
+
+  /**
+   * Drop-in replacement for `hasMed(keywords)` that also marks any
+   * medication whose search terms hit `keywords` as "matched". Used by every
+   * drug-interaction category below so we can detect medications no category
+   * recognized.
+   */
+  const hasMed = (keywords: string[]): boolean => {
+    const normalizedKeywords = keywords.map(normalizeForMatch);
+    let anyMatch = false;
+    for (let i = 0; i < medSearchTerms.length; i++) {
+      const expansions = medSearchTerms[i].map(normalizeForMatch);
+      const hit = expansions.some(exp =>
+        normalizedKeywords.some(k => exp.includes(k))
+      );
+      if (hit) {
+        medMatched[i] = true;
+        anyMatch = true;
+      }
+    }
+    return anyMatch;
+  };
+
   // ══════════════════════════════════════════════════════════════════════════
   // 1. PREGNANCY / NURSING GATE (CRITICAL)
   // ══════════════════════════════════════════════════════════════════════════
@@ -197,9 +269,9 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     ];
     const allBloodThinners = [...warfarinFamily, ...otherBloodThinners, 'aspirin', 'asa ', 'baby aspirin'];
     const btSupplements = ['omega', 'fish oil', 'garlic', 'ginger', 'ginkgo', 'vitamin e', 'resveratrol', 'curcumin', 'nattokinase', 'bromelain'];
-    if (has(medsLower, allBloodThinners) && hasIngr(allIngredients, btSupplements)) {
+    if (hasMed(allBloodThinners) && hasIngr(allIngredients, btSupplements)) {
       const found = matchingIngr(allIngredients, btSupplements);
-      const onWarfarin = has(medsLower, warfarinFamily);
+      const onWarfarin = hasMed(warfarinFamily);
       warnings.push({
         category: 'blood_thinner_interaction',
         severity: onWarfarin ? 'critical' : 'serious',
@@ -234,7 +306,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
       'quetiapine', 'seroquel',
       'aripiprazole', 'abilify',
     ];
-    if (has(medsLower, ssriSnri)) {
+    if (hasMed(ssriSnri)) {
       if (hasIngr(allIngredients, ["st. john", "st john"])) {
         warnings.push({
           category: 'sjw_ssri',
@@ -267,7 +339,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
       'propylthiouracil', 'ptu',
     ];
     const thyroidSupplements = ['thyroid support', 'ashwagandha', 'iodine', 'kelp', 'seaweed', 'selenium', 'zinc'];
-    if (has(medsLower, thyroidMeds) && hasIngr(allIngredients, thyroidSupplements)) {
+    if (hasMed(thyroidMeds) && hasIngr(allIngredients, thyroidSupplements)) {
       const found = matchingIngr(allIngredients, thyroidSupplements);
       warnings.push({
         category: 'thyroid_interaction',
@@ -300,7 +372,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
       'acarbose', 'precose',
     ];
     const diabetesSupplements = ['berberine', 'cinnamon', 'chromium', 'alpha lipoic', 'innoslim', 'bitter melon', 'gymnema'];
-    if (has(medsLower, diabetesMeds) && hasIngr(allIngredients, diabetesSupplements)) {
+    if (hasMed(diabetesMeds) && hasIngr(allIngredients, diabetesSupplements)) {
       const found = matchingIngr(allIngredients, diabetesSupplements);
       warnings.push({
         category: 'diabetes_interaction',
@@ -340,7 +412,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
       'spironolactone', 'aldactone',
     ];
     const bpSupplements = ['magnesium', 'coq10', 'hawthorn', 'garlic', 'omega', 'potassium'];
-    if (has(medsLower, bpMeds) && hasIngr(allIngredients, bpSupplements)) {
+    if (hasMed(bpMeds) && hasIngr(allIngredients, bpSupplements)) {
       const found = matchingIngr(allIngredients, bpSupplements);
       warnings.push({
         category: 'bp_interaction',
@@ -353,7 +425,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
 
     // ── 3g. Immunosuppressants — St. John's Wort (CRITICAL) ─────────────
     const immunoMeds = ['cyclosporine', 'tacrolimus', 'mycophenolate', 'prednisone', 'methotrexate', 'azathioprine', 'sirolimus'];
-    if (has(medsLower, immunoMeds)) {
+    if (hasMed(immunoMeds)) {
       if (hasIngr(allIngredients, ["st. john", "st john"])) {
         warnings.push({
           category: 'sjw_immunosuppressant',
@@ -387,7 +459,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3h. Chemotherapy / Oncology ─────────────────────────────────────
     const chemoKeywords = ['chemotherapy', 'chemo', 'tamoxifen', 'anastrozole', 'letrozole', 'cisplatin', 'carboplatin', 'doxorubicin', 'paclitaxel', 'cyclophosphamide'];
     const chemoSupplements = ["st. john", "st john", 'high-dose', 'nac', 'melatonin'];
-    if (has(medsLower, chemoKeywords) && hasIngr(allIngredients, chemoSupplements)) {
+    if (hasMed(chemoKeywords) && hasIngr(allIngredients, chemoSupplements)) {
       warnings.push({
         category: 'chemo_interaction',
         severity: 'critical',
@@ -407,7 +479,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
       'lovastatin', 'mevacor', 'altoprev',
       'pitavastatin', 'livalo', 'zypitamag',
     ];
-    if (has(medsLower, statins)) {
+    if (hasMed(statins)) {
       if (hasIngr(allIngredients, ['red yeast rice'])) {
         warnings.push({
           category: 'ryr_statin',
@@ -433,7 +505,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3j. Hormone Medications ─────────────────────────────────────────
     const hormoneMeds = ['estradiol', 'progesterone', 'testosterone', 'birth control', 'contraceptive', 'clomid', 'clomiphene', 'finasteride', 'propecia', 'spironolactone'];
     const hormoneSupplements = ['ashwagandha', 'maca', 'dhea', 'dim', 'saw palmetto', 'black cohosh', 'vitex', 'tribulus'];
-    if (has(medsLower, hormoneMeds) && hasIngr(allIngredients, hormoneSupplements)) {
+    if (hasMed(hormoneMeds) && hasIngr(allIngredients, hormoneSupplements)) {
       const found = matchingIngr(allIngredients, hormoneSupplements);
       warnings.push({
         category: 'hormone_interaction',
@@ -447,7 +519,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3k. Seizure / Epilepsy Medications ──────────────────────────────
     const seizureMeds = ['carbamazepine', 'tegretol', 'phenytoin', 'dilantin', 'valproic', 'depakote', 'lamotrigine', 'lamictal', 'gabapentin', 'neurontin', 'levetiracetam', 'keppra', 'topiramate', 'topamax'];
     const seizureSupplements = ['ginkgo', 'evening primrose', 'vitamin b6', "st. john", "st john"];
-    if (has(medsLower, seizureMeds) && hasIngr(allIngredients, seizureSupplements)) {
+    if (hasMed(seizureMeds) && hasIngr(allIngredients, seizureSupplements)) {
       const found = matchingIngr(allIngredients, seizureSupplements);
       warnings.push({
         category: 'seizure_interaction',
@@ -461,7 +533,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3l. Sedatives / Benzodiazepines ─────────────────────────────────
     const sedativeMeds = ['diazepam', 'valium', 'alprazolam', 'xanax', 'lorazepam', 'ativan', 'clonazepam', 'klonopin', 'zolpidem', 'ambien', 'eszopiclone', 'lunesta', 'temazepam'];
     const sedativeSupplements = ['valerian', 'gaba', 'melatonin', 'kava', 'passionflower', 'magnolia'];
-    if (has(medsLower, sedativeMeds) && hasIngr(allIngredients, sedativeSupplements)) {
+    if (hasMed(sedativeMeds) && hasIngr(allIngredients, sedativeSupplements)) {
       const found = matchingIngr(allIngredients, sedativeSupplements);
       warnings.push({
         category: 'sedative_interaction',
@@ -475,7 +547,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3m. Opioid Pain Medications ─────────────────────────────────────
     const opioidMeds = ['oxycodone', 'oxycontin', 'hydrocodone', 'vicodin', 'tramadol', 'ultram', 'morphine', 'codeine', 'fentanyl', 'methadone', 'buprenorphine', 'suboxone'];
     const opioidSupplements = ['valerian', 'gaba', 'kava', 'passionflower', 'magnolia', 'melatonin'];
-    if (has(medsLower, opioidMeds) && hasIngr(allIngredients, opioidSupplements)) {
+    if (hasMed(opioidMeds) && hasIngr(allIngredients, opioidSupplements)) {
       const found = matchingIngr(allIngredients, opioidSupplements);
       warnings.push({
         category: 'opioid_interaction',
@@ -489,7 +561,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3n. ADHD Stimulant Medications ──────────────────────────────────
     const adhdMeds = ['methylphenidate', 'ritalin', 'concerta', 'amphetamine', 'adderall', 'lisdexamfetamine', 'vyvanse', 'dextroamphetamine', 'dexedrine', 'atomoxetine', 'strattera'];
     const adhdSupplements = ['caffeine', 'rhodiola', 'ginseng', 'tyrosine', 'yohimbine', 'synephrine'];
-    if (has(medsLower, adhdMeds) && hasIngr(allIngredients, adhdSupplements)) {
+    if (hasMed(adhdMeds) && hasIngr(allIngredients, adhdSupplements)) {
       const found = matchingIngr(allIngredients, adhdSupplements);
       warnings.push({
         category: 'adhd_interaction',
@@ -503,7 +575,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3o. PPIs / Acid Reducers ────────────────────────────────────────
     const ppiMeds = ['omeprazole', 'prilosec', 'pantoprazole', 'protonix', 'esomeprazole', 'nexium', 'lansoprazole', 'prevacid', 'famotidine', 'pepcid', 'ranitidine'];
     const ppiSupplements = ['iron', 'calcium', 'magnesium', 'vitamin b12', 'zinc'];
-    if (has(medsLower, ppiMeds) && hasIngr(allIngredients, ppiSupplements)) {
+    if (hasMed(ppiMeds) && hasIngr(allIngredients, ppiSupplements)) {
       const found = matchingIngr(allIngredients, ppiSupplements);
       warnings.push({
         category: 'ppi_absorption',
@@ -517,7 +589,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3p. Antibiotics ─────────────────────────────────────────────────
     const antibiotics = ['tetracycline', 'doxycycline', 'minocycline', 'ciprofloxacin', 'cipro', 'levofloxacin', 'levaquin', 'moxifloxacin', 'amoxicillin', 'azithromycin'];
     const antibioticSupplements = ['calcium', 'iron', 'magnesium', 'zinc'];
-    if (has(medsLower, antibiotics) && hasIngr(allIngredients, antibioticSupplements)) {
+    if (hasMed(antibiotics) && hasIngr(allIngredients, antibioticSupplements)) {
       const found = matchingIngr(allIngredients, antibioticSupplements);
       warnings.push({
         category: 'antibiotic_chelation',
@@ -530,7 +602,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
 
     // ── 3q. Corticosteroids ─────────────────────────────────────────────
     const corticosteroids = ['prednisone', 'prednisolone', 'dexamethasone', 'methylprednisolone', 'hydrocortisone', 'budesonide'];
-    if (has(medsLower, corticosteroids)) {
+    if (hasMed(corticosteroids)) {
       if (hasIngr(allIngredients, ['licorice', 'glycyrrhizin'])) {
         warnings.push({
           category: 'corticosteroid_licorice',
@@ -555,7 +627,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3r. Heart Rhythm / Cardiac Glycosides ───────────────────────────
     const cardiacMeds = ['digoxin', 'lanoxin', 'amiodarone', 'flecainide', 'sotalol', 'dofetilide', 'dronedarone'];
     const cardiacSupplements = ['magnesium', 'potassium', 'hawthorn', 'licorice', 'glycyrrhizin'];
-    if (has(medsLower, cardiacMeds) && hasIngr(allIngredients, cardiacSupplements)) {
+    if (hasMed(cardiacMeds) && hasIngr(allIngredients, cardiacSupplements)) {
       const found = matchingIngr(allIngredients, cardiacSupplements);
       warnings.push({
         category: 'cardiac_interaction',
@@ -569,7 +641,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
     // ── 3s. CYP450 Narrow Therapeutic Index ─────────────────────────────
     const narrowTIDrugs = ['warfarin', 'cyclosporine', 'tacrolimus', 'theophylline', 'phenytoin', 'digoxin', 'lithium', 'carbamazepine'];
     const cyp450Supplements = ["st. john", "st john", 'goldenseal', 'grapefruit'];
-    if (has(medsLower, narrowTIDrugs) && hasIngr(allIngredients, cyp450Supplements)) {
+    if (hasMed(narrowTIDrugs) && hasIngr(allIngredients, cyp450Supplements)) {
       const found = matchingIngr(allIngredients, cyp450Supplements);
       warnings.push({
         category: 'cyp450_nti',
@@ -582,7 +654,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
 
     // ── 3t. Kidney Impairment ───────────────────────────────────────────
     const kidneyKeywords = ['kidney', 'renal', 'dialysis', 'ckd', 'chronic kidney'];
-    if (has(medsLower, kidneyKeywords) || has(conditionsLower, kidneyKeywords)) {
+    if (hasMed(kidneyKeywords) || has(conditionsLower, kidneyKeywords)) {
       const kidneySupplements = ['potassium', 'magnesium', 'phosphorus', 'creatine', 'vitamin c'];
       if (hasIngr(allIngredients, kidneySupplements)) {
         const found = matchingIngr(allIngredients, kidneySupplements);
@@ -622,7 +694,7 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
   // ── Immunosuppressants — escalate immune-stimulating supplements to critical ──
   if (medsLower.length > 0) {
     const immunoMedsHigh = ['cyclosporine', 'tacrolimus', 'mycophenolate', 'azathioprine', 'sirolimus'];
-    if (has(medsLower, immunoMedsHigh)) {
+    if (hasMed(immunoMedsHigh)) {
       const immuneStims = ['echinacea', 'astragalus', 'elderberry', 'mushroom', 'beta glucan', 'colostrum'];
       if (hasIngr(allIngredients, immuneStims)) {
         const found = matchingIngr(allIngredients, immuneStims);
@@ -755,11 +827,21 @@ export function validateFormulaSafety(input: SafetyValidationInput): SafetyValid
   const criticalWarnings = warnings.filter(w => w.severity === 'critical');
   const seriousWarnings = warnings.filter(w => w.severity === 'serious');
 
+  // Collect raw medications no drug-interaction category recognized. These
+  // get persisted by the caller for periodic keyword-list grooming. Empty
+  // strings / whitespace-only entries are excluded — they happen when users
+  // submit a stray comma in the medications field.
+  const unmatchedMedications = (input.userMedications || []).filter((raw, i) => {
+    if (!raw || !raw.trim()) return false;
+    return !medMatched[i];
+  });
+
   return {
     safe: criticalWarnings.length === 0,
     requiresAcknowledgment: seriousWarnings.length > 0,
     warnings,
     blockedReasons: criticalWarnings.map(w => w.message),
+    unmatchedMedications,
   };
 }
 

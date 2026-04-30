@@ -254,6 +254,19 @@ export const healthProfiles = pgTable("health_profiles", {
   // Medical history
   conditions: json("conditions").$type<string[]>().default([]),
   medications: json("medications").$type<string[]>().default([]),
+  // AI-normalized version of `medications`. Each entry maps a raw user-typed
+  // medication string to a structured representation so the deterministic
+  // safety validator can match brand names, misspellings, compounded
+  // formulations, and international names against its keyword lists. Updated
+  // asynchronously when `medications` changes; safety validation falls back
+  // to raw input if normalization is missing or stale.
+  medicationsNormalized: json("medications_normalized").$type<Array<{
+    raw: string;
+    generic: string | null;
+    brandFamily: string | null;
+    drugClass: string | null;
+    confidence: number; // 0..1
+  }>>().default([]),
   allergies: json("allergies").$type<string[]>().default([]),
 
   // Health goals (e.g., "gut health", "brain optimization", "energy", "sleep")
@@ -410,6 +423,33 @@ export const safetyAuditLogs = pgTable("safety_audit_logs", {
   }>().notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Unmatched medication log — every time the safety validator runs, any
+// medication string from the user that didn't match ANY keyword in ANY
+// interaction category gets logged here. Reviewed periodically (manually
+// or by the platform-insights agent) to grow the keyword alias lists in
+// safety-validator.ts. This is the data feedback loop that keeps the
+// deterministic safety gate from silently degrading as new drugs launch
+// or users enter brand/compound/international names not in the lists.
+export const unmatchedMedications = pgTable("unmatched_medications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rawInput: text("raw_input").notNull(),
+  // What AI normalization produced (if anything). Helpful when triaging:
+  // if AI knew it was warfarin but the keyword list didn't, that's an
+  // alias gap, not a coverage gap.
+  normalizedGeneric: text("normalized_generic"),
+  normalizedClass: text("normalized_class"),
+  normalizedBrandFamily: text("normalized_brand_family"),
+  normalizationConfidence: integer("normalization_confidence"), // 0..100
+  // Which validator pass logged it (currently always 'safety_validator',
+  // future passes may include 'interaction_check' or 'pharmacist_review').
+  contextEvent: text("context_event").notNull().default('safety_validator'),
+  // Whether a human or insights agent has triaged this row.
+  triagedAt: timestamp("triaged_at"),
+  triageNote: text("triage_note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -959,6 +999,13 @@ export const insertSafetyAuditLogSchema = createInsertSchema(safetyAuditLogs).om
   createdAt: true,
 });
 
+export const insertUnmatchedMedicationSchema = createInsertSchema(unmatchedMedications).omit({
+  id: true,
+  createdAt: true,
+  triagedAt: true,
+  triageNote: true,
+});
+
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
   id: true,
   createdAt: true,
@@ -1079,6 +1126,9 @@ export type FormulaWarningAcknowledgment = typeof formulaWarningAcknowledgments.
 
 export type InsertSafetyAuditLog = z.infer<typeof insertSafetyAuditLogSchema>;
 export type SafetyAuditLog = typeof safetyAuditLogs.$inferSelect;
+
+export type InsertUnmatchedMedication = z.infer<typeof insertUnmatchedMedicationSchema>;
+export type UnmatchedMedication = typeof unmatchedMedications.$inferSelect;
 
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 export type Subscription = typeof subscriptions.$inferSelect;

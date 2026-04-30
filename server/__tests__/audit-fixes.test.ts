@@ -191,3 +191,71 @@ describe('Audit fixes — pregnancy/nursing detection', () => {
     expect(detectNursingStatus(['back pain', 'insomnia'])).toBe(false);
   });
 });
+
+describe('Audit fixes — safety validator unmatched + normalized medications', () => {
+  const baseFormula = {
+    bases: [],
+    additions: [{ ingredient: 'Vitamin D3', amount: 2000, unit: 'iu' }],
+  };
+
+  it('reports unmatched medications when nothing in any category recognizes them', () => {
+    const result = validateFormulaSafety({
+      formula: baseFormula,
+      userMedications: ['Glerbozimab 5mg', '   '],
+      userConditions: [],
+      userAllergies: [],
+      isPregnant: false,
+      isNursing: false,
+    });
+    // Empty/whitespace strings should be filtered out; only the unrecognized
+    // real string should land in unmatchedMedications.
+    expect(result.unmatchedMedications).toEqual(['Glerbozimab 5mg']);
+  });
+
+  it('does NOT report a medication as unmatched when it triggers an interaction rule', () => {
+    const result = validateFormulaSafety({
+      formula: { bases: [], additions: [{ ingredient: 'Garlic Extract', amount: 500, unit: 'mg' }] },
+      userMedications: ['warfarin 5mg'],
+      userConditions: [],
+      userAllergies: [],
+      isPregnant: false,
+      isNursing: false,
+    });
+    expect(result.unmatchedMedications || []).not.toContain('warfarin 5mg');
+  });
+
+  it('uses normalized brand/generic to match when raw input is unrecognized', () => {
+    // "Mystery Pill" alone won't match the warfarin guard. With a normalized
+    // entry mapping it to generic='warfarin', the same formula now trips
+    // a critical bleeding risk warning.
+    const baseline = validateFormulaSafety({
+      formula: { bases: [], additions: [{ ingredient: 'Garlic Extract', amount: 500, unit: 'mg' }] },
+      userMedications: ['Mystery Pill'],
+      userConditions: [],
+      userAllergies: [],
+      isPregnant: false,
+      isNursing: false,
+    });
+    expect(baseline.warnings.some(w => w.category === 'blood_thinner_interaction')).toBe(false);
+
+    const withNormalization = validateFormulaSafety({
+      formula: { bases: [], additions: [{ ingredient: 'Garlic Extract', amount: 500, unit: 'mg' }] },
+      userMedications: ['Mystery Pill'],
+      userMedicationsNormalized: [{
+        raw: 'Mystery Pill',
+        generic: 'warfarin',
+        brandFamily: null,
+        drugClass: 'anticoagulant',
+        confidence: 0.95,
+      }],
+      userConditions: [],
+      userAllergies: [],
+      isPregnant: false,
+      isNursing: false,
+    });
+    expect(withNormalization.warnings.some(w => w.category === 'blood_thinner_interaction')).toBe(true);
+    expect(withNormalization.safe).toBe(false);
+    // And the normalized medication is no longer "unmatched"
+    expect(withNormalization.unmatchedMedications || []).not.toContain('Mystery Pill');
+  });
+});

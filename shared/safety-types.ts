@@ -33,6 +33,19 @@ export interface SafetyValidationResult {
   warnings: SafetyWarning[];
   /** Hard-blocked reasons (subset of critical warnings) */
   blockedReasons: string[];
+  /**
+   * User medications that did NOT match any keyword in any drug-interaction
+   * category. Surfaced so the calling layer can persist them to the
+   * `unmatched_medications` table for periodic review — this is the feedback
+   * loop that keeps the deterministic safety gate's keyword lists from
+   * silently degrading as new drugs launch or users enter
+   * brand/compound/international names not yet in the lists.
+   *
+   * Note: A medication being "unmatched" does NOT mean it's safe — it means
+   * the validator could not reason about it. The chat AI still sees the raw
+   * medication string and may apply additional caution.
+   */
+  unmatchedMedications?: string[];
 }
 
 // ── Ingredient Contraindication Data ────────────────────────────────────────

@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import logger from '../../infra/logging/logger';
 import { type InsertHealthProfile, type InsertSubscription, type InsertPaymentMethodRef } from '@shared/schema';
 import { billingService } from '../billing/billing.service';
+import { normalizeMedications } from '../health/medication-normalizer';
 
 export class UsersService {
     // User profile operations
@@ -58,14 +59,53 @@ export class UsersService {
     async saveHealthProfile(userId: string, healthProfileData: Partial<InsertHealthProfile>) {
         const existingProfile = await usersRepository.getHealthProfile(userId);
 
-        if (existingProfile) {
-            return await usersRepository.updateHealthProfile(userId, healthProfileData);
-        } else {
-            return await usersRepository.createHealthProfile({
+        const saved = existingProfile
+            ? await usersRepository.updateHealthProfile(userId, healthProfileData)
+            : await usersRepository.createHealthProfile({
                 userId,
                 ...healthProfileData
             } as InsertHealthProfile);
+
+        // Fire-and-forget medication normalization. We don't await — the profile
+        // save returns immediately and the AI-normalized list lands on the row
+        // shortly after. Subsequent safety-validation calls pick up whichever
+        // version is current. On failure, we keep the previous normalized list
+        // so the safety gate has SOMETHING to work with.
+        if (Object.prototype.hasOwnProperty.call(healthProfileData, 'medications')) {
+            const newMeds = (healthProfileData as { medications?: string[] }).medications || [];
+            const oldMeds = existingProfile?.medications || [];
+            const changed =
+                newMeds.length !== oldMeds.length ||
+                newMeds.some((m, i) => (m || '').trim().toLowerCase() !== (oldMeds[i] || '').trim().toLowerCase());
+            if (changed) {
+                this._refreshMedicationNormalizationAsync(userId, newMeds);
+            }
         }
+
+        return saved;
+    }
+
+    /**
+     * Background task: re-run AI normalization for a user's medications and
+     * persist the result on healthProfiles.medicationsNormalized. Safe to
+     * fire-and-forget — never throws, never blocks the calling request.
+     */
+    private _refreshMedicationNormalizationAsync(userId: string, medications: string[]): void {
+        (async () => {
+            try {
+                const normalized = await normalizeMedications(medications);
+                await usersRepository.updateHealthProfile(userId, {
+                    medicationsNormalized: normalized,
+                } as Partial<InsertHealthProfile>);
+                logger.info('Medication normalization refreshed', {
+                    userId,
+                    count: normalized.length,
+                    matched: normalized.filter(n => n.generic !== null).length,
+                });
+            } catch (err) {
+                logger.error('Medication normalization refresh failed', { userId, error: err });
+            }
+        })();
     }
 
     async saveMedicationDisclosure(
@@ -112,6 +152,12 @@ export class UsersService {
             disclosedAt,
             consentId: consent.id,
         });
+
+        // Trigger background normalization so the safety validator picks up
+        // brand/compound aliases on the next formula generation.
+        if (medications.length > 0) {
+            this._refreshMedicationNormalizationAsync(userId, medications);
+        }
 
         return { disclosedAt, consentId: consent.id };
     }
